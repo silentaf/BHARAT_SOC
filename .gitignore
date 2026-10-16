@@ -1,0 +1,13 @@
+.venv/
+.cache/
+__pycache__/
+*.pyc
+data/
+models/
+outputs/
+third_party/
+*.pte
+*.hef
+*.onnx
+*.pth
+*.pt

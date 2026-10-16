@@ -1,0 +1,19 @@
+# Laptop (x86-64): install CPU-only PyTorch first, so pip doesn't pull the multi-GB CUDA build:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+# Raspberry Pi 5 (aarch64): pip install -r requirements.txt
+# Tested versions (2026-10-16): torch 2.14.1, torchvision 0.29.1, executorch 1.5.1, onnxruntime 1.31.0
+torch
+torchvision
+executorch==1.5.1
+numpy
+pillow
+opencv-python
+pyyaml
+scikit-learn
+flask
+onnx
+onnxscript
+onnxruntime
+huggingface_hub
+pytest

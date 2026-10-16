@@ -1,0 +1,24 @@
+# ExecuTorch export of Llama 3.2 1B Instruct for the advisory pipeline (Arm CPU, XNNPACK).
+# Used by scripts/export_llama.py. Paths are relative to the project root.
+base:
+  model_class: llama3_2
+  checkpoint: models/llama3_2_1b/consolidated.00.pth
+  params: models/llama3_2_1b/params.json
+  metadata: '{"get_bos_id":128000, "get_eos_ids":[128009, 128001]}'
+model:
+  use_kv_cache: true
+  use_sdpa_with_kv_cache: true
+  dtype_override: fp32
+quantization:
+  qmode: 8da4w            # 4-bit weights, 8-bit dynamic activations (XNNPACK / KleidiAI kernels on Arm)
+  group_size: 32
+  embedding_quantize: "4,32"
+backend:
+  xnnpack:
+    enabled: true
+    extended_ops: true
+export:
+  max_seq_length: 768     # prompt + answer budget; advisory prompts are ~150–450 tokens
+  max_context_length: 768
+  output_dir: models
+  output_name: llama3_2_1b_8da4w.pte

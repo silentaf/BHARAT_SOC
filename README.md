@@ -1,0 +1,144 @@
+# QC-Assist — On-device PCB Inspection Assistant
+
+**Bharat AI-SoC Challenge 2026–27 · PS5: Real-time industrial defect detection & quality-control assistant**
+Theme: Manufacturing & Industry 4.0
+
+QC-Assist inspects printed circuit boards in real time on a Raspberry Pi 5, highlights
+defects, rates their severity, and gives the operator advice from **Llama 3.2 1B
+running on-device through ExecuTorch** — fully offline, nothing leaves the factory floor.
+
+![QC-Assist operator dashboard: a VisA PCB with a damaged pin outlined in red](docs/images/dashboard.png)
+
+## Results so far (laptop CPU — Raspberry Pi 5 numbers next)
+
+VisA PCB categories, official one-class split (100 good + 100 defective test boards each),
+trained on good boards only. Full JSON: [`results/x86_64/`](results/x86_64/).
+
+| Board | Image AUROC | Pixel AUROC | Defects caught | False alarms | ms / frame (ONNX Runtime) |
+|---|---|---|---|---|---|
+| pcb1 | 0.972 | 0.996 | 80% | 5% | 32.9 |
+| pcb2 | 0.932 | 0.986 | 81% | 5% | 32.7 |
+| pcb3 | 0.924 | 0.989 | 53% | 3% | 32.4 |
+| pcb4 | 0.990 | 0.985 | 91% | 3% | 33.2 |
+
+## Status (Phase 1)
+
+| Part | State |
+|---|---|
+| Good-only anomaly detection, severity, inspection log | working, benchmarked on laptop |
+| Operator dashboard (offline), teach-a-new-board | working |
+| Llama via ExecuTorch (`TextLLMRunner`, 8da4w, XNNPACK) | pipeline verified with a random-weight Llama 3.2-architecture model; real Llama 3.2 1B export pending model access |
+| ONNX export of the NPU part + Hailo calibration set | working; HEF compile pending Hailo DFC |
+| Raspberry Pi 5 / AI HAT+ runs | pending hardware |
+
+## Why it is different
+
+- **Learns from good boards only.** Show it ~20 defect-free boards and it can inspect
+  that product. Factories rarely have labelled defect photos; this needs none.
+- **Uses the whole SoC.** Vision runs on the Hailo NPU (AI HAT+) or the Arm CPU;
+  Llama runs on the Arm CPU via ExecuTorch (XNNPACK / KleidiAI). Inspection never
+  waits for the LLM.
+- **Measured, not claimed.** Every number in the report comes from `scripts/evaluate.py`
+  and the inspection log.
+
+## Architecture
+
+```
+ camera ──► preprocess ──► CNN backbone ──► patch features ──► nearest-normal search ──► anomaly map
+                          (Hailo NPU / CPU)                      (Arm CPU, memory bank)        │
+                                                                                               ▼
+                                         operator UI ◄── severity + location ◄─────────── threshold
+                                              ▲                    │
+                                              │                    ▼
+                         Llama 3.2 1B (ExecuTorch, Arm CPU) ◄── inspection log (SQLite)
+                         advice · shift reports · log Q&A        (background worker)
+```
+
+The Hailo vision pipeline (HailoRT) and the Llama pipeline (ExecuTorch) are separate,
+as the PS5 rules require.
+
+## Repository layout
+
+| Path | What |
+|---|---|
+| `qc_assist/anomaly.py` | PatchCore-style detector trained on good parts only |
+| `qc_assist/severity.py` | anomaly map → severity, defect area, location |
+| `qc_assist/advisor.py` | Llama advisory through the ExecuTorch runner (async) |
+| `qc_assist/inspection_log.py` | SQLite log of every inspection |
+| `qc_assist/inspector.py` | inspection engine: vision thread, Llama worker, "teach a new board" |
+| `qc_assist/dashboard.py` | offline operator web dashboard |
+| `scripts/prepare_visa.py` | extract VisA PCB categories into MVTec layout |
+| `scripts/train.py` | build a model from good images |
+| `scripts/run_inspection.py` | headless inspection loop on a camera or an image folder |
+| `scripts/dashboard.py` | start the operator dashboard |
+| `scripts/evaluate.py` | accuracy + latency benchmark → JSON (`--backend torch\|onnx`) |
+| `scripts/export_onnx.py` | export the NPU part to ONNX + Hailo calibration set |
+| `scripts/export_llama.py` | export Llama 3.2 1B to ExecuTorch `.pte` (`configs/llama_export.yaml`) |
+| `docs/executorch_llama.md` | exporting and running Llama 3.2 1B with ExecuTorch |
+| `docs/hailo.md` | compiling and running the vision network on the Hailo NPU |
+| `configs/default.yaml` | product, detector, severity and Llama settings |
+| `scripts/benchmark_all.sh` | train + benchmark all PCB categories, both CPU backends |
+| `results/<arch>/` | benchmark JSON per machine (evidence for the report) |
+| `docs/technical_report.md` | Phase 1 technical report (draft) |
+| `PLAN.md` | Phase 1 plan and deliverables checklist |
+
+## Quick start (laptop)
+
+```bash
+python3 -m venv .venv            # or: virtualenv .venv
+.venv/bin/pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+.venv/bin/pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+.venv/bin/pytest -q              # smoke test on synthetic boards
+```
+
+Llama 3.2 1B: download, export to `.pte` with `scripts/export_llama.py`, done —
+see `docs/executorch_llama.md`.
+
+Get the VisA dataset (CC BY 4.0, 1.9 GB) and convert its PCB categories to MVTec layout:
+
+```bash
+mkdir -p data/raw
+curl -C - -o data/raw/VisA_20220922.tar https://amazon-visual-anomaly.s3.us-west-2.amazonaws.com/VisA_20220922.tar
+curl -o data/raw/visa_1cls.csv https://raw.githubusercontent.com/amazon-science/spot-diff/main/split_csv/1cls.csv
+.venv/bin/python -I scripts/prepare_visa.py --tar data/raw/VisA_20220922.tar --csv data/raw/visa_1cls.csv --out data/visa
+```
+
+Train, benchmark, inspect:
+
+```bash
+.venv/bin/python scripts/train.py --data data/visa/pcb1 --out models/pcb1.pt
+.venv/bin/python scripts/evaluate.py --model models/pcb1.pt --data data/visa/pcb1
+.venv/bin/python scripts/run_inspection.py --model models/pcb1.pt --source data/visa/pcb1/test
+```
+
+Operator dashboard (open http://localhost:8000):
+
+```bash
+.venv/bin/python scripts/dashboard.py --source 0 --model models/pcb1.pt                 # camera
+.venv/bin/python scripts/dashboard.py --source data/visa/pcb1/test --model models/pcb1.pt --max-fps 2 --loop
+```
+
+It shows the live heatmap, the verdict and its latency, Llama advice, shift statistics, a
+shift report, questions about the inspection log, an English/Hindi toggle, and **Teach a
+new board**, which captures 20 good boards from the camera, trains, and swaps in the new
+model without a restart.
+
+Until Llama is configured (see `docs/executorch_llama.md`) the advisor runs a
+clearly-labelled rule-based fallback.
+
+## Hardware
+
+| Part | Role |
+|---|---|
+| Raspberry Pi 5 (8 GB) | Arm Cortex-A76 CPU: Llama (ExecuTorch), nearest-neighbour search, UI |
+| Raspberry Pi AI HAT+ | Hailo NPU: CNN backbone (HailoRT) |
+| Camera Module 3 | image capture |
+
+## Datasets and licenses
+
+- VisA — CC BY 4.0 (Zou et al., "SPot-the-Difference Self-supervised Pre-training for Anomaly
+  Detection and Segmentation", ECCV 2022); the dashboard screenshot shows a VisA image
+- MVTec AD — CC BY-NC-SA 4.0 (non-commercial)
+- Llama 3.2 — Llama 3.2 Community License
+
+Datasets and model weights are not committed; see the commands above.

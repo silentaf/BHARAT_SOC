@@ -1,0 +1,18 @@
+{
+  "model": "pcb4.pt",
+  "host": "VLSI",
+  "machine": "x86_64",
+  "backend": "onnx",
+  "torch_threads": 16,
+  "n_images": 201,
+  "image_auroc": 0.99,
+  "pixel_auroc": 0.985346291379481,
+  "recall_at_threshold": 0.91,
+  "false_alarm_rate": 0.0297029702970297,
+  "latency_ms": {
+    "mean": 33.17262880624022,
+    "p50": 32.74151300138328,
+    "p95": 35.14229699794669
+  },
+  "fps": 30.14533475296617
+}
