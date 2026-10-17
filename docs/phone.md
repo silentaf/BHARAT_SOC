@@ -70,3 +70,7 @@ then opens full screen like an app. Point the camera at a board.
 - `pip` killed / app closes: not enough free RAM. Close other apps; 8 GB phones are safer.
 - Camera URL fails: IP Webcam must show "server running"; try http://127.0.0.1:8080 in Chrome.
 - Slow first Llama answer: the model loads on first use (~10–20 s on a phone).
+- Termux closes by itself / "process completed (signal 9)": Android 12+ kills background
+  processes. Set Termux's battery usage to **Unrestricted** (App info → Battery), keep Termux in
+  the foreground during setup, and on Android 14+ turn on Developer options → **Disable child
+  process restrictions**.
