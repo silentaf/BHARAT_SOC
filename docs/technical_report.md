@@ -1,11 +1,19 @@
 # QC-Assist: On-device PCB Inspection with Llama Advisory on Arm
 
 **Bharat AI-SoC Challenge 2026–27 — Phase 1 (Open Qualifying) technical report**
-Problem Statement 5: Real-time industrial defect detection & quality-control assistant
-Team: _<team name>_ · _<college>_ · Faculty mentor: _<name>_
 
-> Draft. Every `TBD` is filled only from measured results (`outputs/benchmarks/*.json`,
-> the inspection log). Do not round up or estimate numbers in this report.
+Problem Statement 5: Real-time industrial defect detection & quality-control assistant ·
+Theme: Manufacturing & Industry 4.0
+
+**Team:** [TEAM NAME] · **Institute:** [COLLEGE] · **Members:** [NAMES] · **Faculty mentor:** [MENTOR NAME]
+
+**Code:** https://github.com/silentaf/BHARAT_SOC
+
+> **Phase 1 scope.** The solution is implemented end to end and measured on an x86-64 laptop
+> CPU; the Arm deployment artefacts (ExecuTorch `.pte`, Hailo HEF) are built and verified
+> (§6.5). The Raspberry Pi 5 + AI HAT+ 2 measurements are Phase 2, on the hardware provided
+> to shortlisted teams, and are marked "Phase 2" below. Every number in this report comes
+> from a JSON file in `results/x86_64/` produced by the scripts in the repository.
 
 ## 1. Problem
 
@@ -104,7 +112,13 @@ DFC 3.x), Camera Module 3.
 ### 4.3 Product features
 - Operator dashboard served locally (no internet, no external assets).
 - Teach a new board: capture N good boards from the camera, retrain on-device, hot-swap
-  the model. Measured teach time on Pi 5: TBD.
+  the model. Measured on the laptop: 3.0 s for 20 boards, including setting the alarm
+  threshold by 5-fold scoring of the 20 boards (§6.6); Pi 5: Phase 2.
+
+![Operator dashboard: a VisA PCB with bent pins outlined, rated MAJOR, type "bent", with the plant rule and Llama advice](images/dashboard.png)
+
+*Operator dashboard (laptop, Phase 1): heatmap and outline, severity, defect type, vision
+latency, Llama advice from ExecuTorch, shift statistics, questions, teach a new board.*
 
 ## 5. Optimisation
 
@@ -118,7 +132,8 @@ DFC 3.x), Camera Module 3.
 | Disable ONNX Runtime thread spin-waiting | 166 → 11 ms per frame (ORT threads were starving the PyTorch kNN step) |
 | ONNX graph with one output per backbone layer (upsample + concat moved to CPU) | Hailo quantisation failed with one concatenated output (layers need separate scales); compiles with two |
 | Hailo NPU INT8 (DFC emulator, 4 boards) | mean image AUROC 0.955 → 0.956, pixel AUROC 0.989 → 0.989: no measurable loss |
-| Llama 8da4w + 4-bit embeddings | 860 MB `.pte`, 1.47 GB peak RAM, 31 tokens/s decode on the laptop CPU; Pi 5 TBD |
+| Llama 8da4w + 4-bit embeddings | 860 MB `.pte`, 1.42 GB peak RAM, 31 tokens/s decode on the laptop CPU; Pi 5: Phase 2 |
+| "Teach" threshold from 5-fold scoring of all 20 boards instead of 2 held-out boards | false alarms with 20 boards: pcb1 12% → 5%, pcb3 19% → 4%, pcb4 30% → 5% (pcb2 0% → 0%); recall 74/79/100% → 49/58/89% |
 | Facts as text + few-shot + output checks instead of a JSON prompt | Llama outputs passing all checks: 17 of 18 (laptop benchmark); before, 1B output was frequently wrong (see §4.2) |
 | Defect-type descriptor: residual vs nearest normal patch instead of the raw feature (pcb1, 1-NN, leave-one-out) | accuracy 0.79 → 0.89 |
 
@@ -147,9 +162,9 @@ features, kNN, anomaly map), from `scripts/evaluate.py` on the 200 test boards.
 |---|---|---|
 | Laptop CPU (x86-64, 16 threads), PyTorch | 43.2 / 47.1 (mean of 4 products) | 23.4 |
 | Laptop CPU (x86-64, 16 threads), ONNX Runtime | 40.2 / 46.5 (mean of 4 products) | 24.9 |
-| Pi 5 CPU, PyTorch | TBD | TBD |
-| Pi 5 CPU, ONNX Runtime | TBD | TBD |
-| Pi 5 + AI HAT+, HailoRT | TBD | TBD |
+| Pi 5 CPU, PyTorch | Phase 2 | Phase 2 |
+| Pi 5 CPU, ONNX Runtime | Phase 2 | Phase 2 |
+| Pi 5 + AI HAT+ 2, HailoRT | Phase 2 | Phase 2 |
 
 The laptop is shared and was busy (load average 14) during the final run; pcb1 with ONNX
 Runtime measured 33.3 and 39.8 ms in two back-to-back runs. Earlier quiet-machine runs gave
@@ -157,11 +172,11 @@ Runtime measured 33.3 and 39.8 ms in two back-to-back runs. Earlier quiet-machin
 
 | Llama 3.2 1B (ExecuTorch, 8da4w, XNNPACK) | Laptop (x86-64) | Pi 5 |
 |---|---|---|
-| Prefill tokens/s (median) | 244 | TBD |
-| Decode tokens/s (median) | 31.0 | TBD |
-| Defect advice, request to text (median) | 2.3 s | TBD |
-| Load + first call | 6.5 s | TBD |
-| Peak RAM (whole process) | 1,422 MB | TBD |
+| Prefill tokens/s (median) | 244 | Phase 2 |
+| Decode tokens/s (median) | 31.0 | Phase 2 |
+| Defect advice, request to text (median) | 2.3 s | Phase 2 |
+| Load + first call | 6.5 s | Phase 2 |
+| Peak RAM (whole process) | 1,422 MB | Phase 2 |
 
 Source: `scripts/bench_llama.py --repeats 3` → `results/x86_64/llama_VLSI.json`, which also
 holds every generated text and whether it passed the checks:
@@ -208,9 +223,35 @@ compile time 122 s per board on the laptop CPU. Accuracy of the INT8 model with 
 | pcb4 | 0.990 → 0.990 | 0.985 → 0.984 | 91% → 92% | 3% → 3% |
 | **mean** | **0.955 → 0.956** | **0.989 → 0.989** | **76% → 79%** | **4% → 4%** |
 
-NPU latency and power: TBD on hardware.
+NPU latency and power: Phase 2, on the AI HAT+ 2.
 
-Power (USB-C meter, Pi 5): idle TBD W, inspecting TBD W, inspecting + Llama TBD W.
+Power (USB-C meter on the Pi 5: idle, inspecting, inspecting + Llama): Phase 2.
+
+### 6.5 Arm deployment readiness
+
+| Piece | State in Phase 1 |
+|---|---|
+| Llama 3.2 1B `.pte` (ExecuTorch, XNNPACK, 8da4w) | Exported and run through the same `TextLLMRunner` API that runs on the Pi; XNNPACK uses Arm KleidiAI kernels on Cortex-A76 |
+| Vision HEF for Hailo-10H (AI HAT+ 2) | Compiled with the Hailo DFC 5.4 for all four boards; INT8 accuracy verified in the DFC emulator (§6.4) |
+| HailoRT backend (`--backend hailo`) | Implemented with HailoRT's `VDevice` / `create_infer_model` API; runs on the device in Phase 2 |
+| Python dependencies | ExecuTorch 1.5.1, PyTorch 2.14.1 and ONNX Runtime publish aarch64 wheels: `pip install -r requirements.txt` on Raspberry Pi OS 64-bit |
+| Pi benchmarks | One command each: `THREADS=4 bash scripts/benchmark_all.sh`, `scripts/bench_llama.py` |
+
+### 6.6 Learning from few good boards
+
+Image AUROC on the full test split when the model is taught from only N good boards
+(`results/x86_64/teach_curve_VLSI.json`; fitting takes 0.3 s / 0.6 s / 1.4 s on the laptop):
+
+| Good boards | pcb1 | pcb2 | pcb3 | pcb4 | mean |
+|---|---|---|---|---|---|
+| 10 | 0.862 | 0.856 | 0.874 | 0.949 | 0.885 |
+| 20 | 0.911 | 0.906 | 0.884 | 0.980 | 0.920 |
+| 50 | 0.935 | 0.925 | 0.919 | 0.993 | 0.943 |
+| 200 (§6.1) | 0.972 | 0.932 | 0.924 | 0.990 | 0.955 |
+
+With 20 boards the alarm threshold is set by 5-fold scoring (§4.3), which keeps false
+alarms near 5%; detection of subtle defects is lower than with 200 boards (pcb2 recall
+stays low at 20 boards), so a factory starts with ~20 and adds boards as they pass.
 
 ## 7. Limitations
 
@@ -227,15 +268,31 @@ Power (USB-C meter, Pi 5): idle TBD W, inspecting TBD W, inspecting + Llama TBD 
   every wording error (e.g. "lowest" next to the largest count with correct numbers).
 - Severity cut-offs are heuristics and must be tuned per product with a quality engineer.
 
-## 8. Phase 2 plan
+## 8. Demo
 
-- HailoRT backend measured on the AI HAT+ (code and HEF ready; INT8 accuracy already checked
-  in the emulator).
+The Phase 1 demo video follows `docs/demo_script.md`: live inspection with defect types
+and Llama advice, operator questions and the shift report, Hindi, and teaching a new board
+type from 20 good boards. It runs on the laptop with `scripts/demo.py`.
+
+## 9. Phase 2 plan
+
+- Run every benchmark on the Raspberry Pi 5 (CPU) and Pi 5 + AI HAT+ 2 (HailoRT): vision
+  latency, Llama tokens/s, RAM and power. Code, `.pte` and HEF are ready (§6.5).
+- Our own boards under a fixed camera with controlled lighting; teach them on the device.
 - Operator labelling of defect types from the dashboard, so the type model grows on the line.
 - Hindi voice output for operators.
-- Field test with real boards on a demo conveyor or turntable.
 
-## 9. Reproducibility
+## 10. Reproducibility
 
-All code, configs and scripts: https://github.com/silentaf/BHARAT_SOC. Datasets and weights are downloaded by
-the scripts and not redistributed. Licenses: VisA CC BY 4.0; Llama 3.2 Community License.
+All code, configs and scripts: https://github.com/silentaf/BHARAT_SOC (datasets and model
+weights are downloaded by the scripts, not redistributed). Every table above is produced by:
+
+```
+python -I scripts/prepare_visa.py --tar VisA_20220922.tar --csv 1cls.csv --out data/visa
+bash scripts/benchmark_all.sh                      # train + accuracy/latency, torch and ONNX (§6.1, §6.2)
+python scripts/train_types.py --model models/pcb1.pt --data data/visa/pcb1   # defect types (§6.3)
+python scripts/export_llama.py && python scripts/bench_llama.py --repeats 3   # Llama (§6.2)
+bash scripts/compile_hailo.sh                      # HEF + INT8 emulator accuracy (§6.4)
+```
+
+Licenses: VisA CC BY 4.0 (Zou et al., ECCV 2022); Llama 3.2 Community License.

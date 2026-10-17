@@ -1,0 +1,59 @@
+{
+  "note": "image AUROC on the full VisA test split when the model is taught from only N good boards (evenly spaced from train/good); fit_s excludes image loading; laptop CPU",
+  "pcb1": {
+    "10": {
+      "image_auroc": 0.862,
+      "fit_s": 0.34
+    },
+    "20": {
+      "image_auroc": 0.911,
+      "fit_s": 0.57
+    },
+    "50": {
+      "image_auroc": 0.935,
+      "fit_s": 1.46
+    }
+  },
+  "pcb2": {
+    "10": {
+      "image_auroc": 0.856,
+      "fit_s": 0.32
+    },
+    "20": {
+      "image_auroc": 0.906,
+      "fit_s": 0.54
+    },
+    "50": {
+      "image_auroc": 0.925,
+      "fit_s": 1.43
+    }
+  },
+  "pcb3": {
+    "10": {
+      "image_auroc": 0.874,
+      "fit_s": 0.3
+    },
+    "20": {
+      "image_auroc": 0.884,
+      "fit_s": 0.54
+    },
+    "50": {
+      "image_auroc": 0.919,
+      "fit_s": 1.42
+    }
+  },
+  "pcb4": {
+    "10": {
+      "image_auroc": 0.949,
+      "fit_s": 0.29
+    },
+    "20": {
+      "image_auroc": 0.98,
+      "fit_s": 0.54
+    },
+    "50": {
+      "image_auroc": 0.993,
+      "fit_s": 1.43
+    }
+  }
+}

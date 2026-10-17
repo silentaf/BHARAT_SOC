@@ -40,10 +40,13 @@ deterministic text ([`results/x86_64/llama_VLSI.json`](results/x86_64/llama_VLSI
 | Part | State |
 |---|---|
 | Good-only anomaly detection, severity, defect type, inspection log | working, benchmarked on laptop |
-| Operator dashboard (offline), teach-a-new-board | working |
+| Operator dashboard (offline), teach a new board from 20 good boards (3 s on the laptop) | working |
 | Llama 3.2 1B via ExecuTorch (`TextLLMRunner`, 8da4w, XNNPACK), EN + HI, output checks | working, benchmarked on laptop |
-| Hailo: ONNX → INT8 → HEF (DFC 5.4, Hailo-10H), INT8 accuracy in emulator | working; HailoRT run pending hardware |
-| Raspberry Pi 5 / AI HAT+ runs | pending hardware |
+| Hailo: ONNX → INT8 → HEF (DFC 5.4, Hailo-10H), INT8 accuracy in emulator | working; HailoRT run in Phase 2 |
+| Raspberry Pi 5 / AI HAT+ 2 runs | Phase 2 (hardware provided to shortlisted teams) |
+
+Phase 1 report: [`docs/technical_report.md`](docs/technical_report.md) (PDF: `python scripts/build_report.py`).
+Demo video script: [`docs/demo_script.md`](docs/demo_script.md).
 
 ## Why it is different
 
@@ -99,6 +102,15 @@ as the PS5 rules require.
 | `results/<arch>/` | benchmark JSON per machine (evidence for the report) |
 | `docs/technical_report.md` | Phase 1 technical report (draft) |
 | `PLAN.md` | Phase 1 plan and deliverables checklist |
+| `scripts/demo.py` | demo scenes for the video (`inspect`, `teach`) |
+| `scripts/build_report.py` | technical report → PDF |
+
+## Demo
+
+```bash
+.venv/bin/python scripts/demo.py inspect   # good + defective boards, types, Llama advice -> http://127.0.0.1:8000
+.venv/bin/python scripts/demo.py teach     # new board type with no model: "Train from folder", inspecting in ~3 s
+```
 
 ## Quick start (laptop)
 

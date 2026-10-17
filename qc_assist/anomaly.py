@@ -29,6 +29,7 @@ import qc_assist  # noqa: F401  (sets TORCH_HOME)
 from .defect_types import TOP_PATCHES, DefectTypeClassifier
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
+KFOLD_MAX_IMAGES = 100  # below this, "teach" sets the threshold by k-fold over all images
 IMAGENET_STD = (0.229, 0.224, 0.225)
 
 
@@ -199,6 +200,12 @@ class PatchCore:
         calib_images (separate good images) if given, else on a held-out val_fraction."""
         if calib_images:
             train, val = good_images, calib_images
+        elif len(good_images) <= KFOLD_MAX_IMAGES:
+            # "Teach a new board" with ~20 boards: holding out 10% would leave 2 images to set the
+            # threshold. Measured with 20 boards: false alarms 12-30% that way, ~5% with 5-fold.
+            self.memory_bank = self._bank(good_images, batch_size)
+            self.threshold = self._kfold_threshold(good_images, batch_size)
+            return
         else:
             rng = np.random.default_rng(seed)
             idx = rng.permutation(len(good_images))
@@ -206,19 +213,37 @@ class PatchCore:
             val = [good_images[i] for i in idx[:n_val]]
             train = [good_images[i] for i in idx[n_val:]]
 
+        self.memory_bank = self._bank(train, batch_size)
+        # Threshold = high percentile of scores on held-out good parts.
+        scores = self._scores(val if val else train, batch_size)
+        self.threshold = float(np.percentile(scores, self.cfg.threshold_percentile))
+
+    def _bank(self, images: list[np.ndarray], batch_size: int = 16) -> torch.Tensor:
+        """Coreset memory bank of the patch features of `images`."""
         patches = []
-        for i in range(0, len(train), batch_size):
-            emb, _ = self.embed(self.preprocess(train[i:i + batch_size]))
+        for i in range(0, len(images), batch_size):
+            emb, _ = self.embed(self.preprocess(images[i:i + batch_size]))
             patches.append(emb.reshape(-1, emb.shape[-1]))
         bank = torch.cat(patches)
-        n_keep = max(1, int(len(bank) * self.cfg.coreset_ratio))
-        self.memory_bank = greedy_coreset(bank, n_keep)
+        return greedy_coreset(bank, max(1, int(len(bank) * self.cfg.coreset_ratio)))
 
-        # Threshold = high percentile of scores on held-out good parts.
-        calib = val if val else train
-        raw = [self._raw_map(self.preprocess(calib[i:i + batch_size])) for i in range(0, len(calib), batch_size)]
-        scores = torch.cat([m.flatten(1).max(dim=1).values for m in raw]).cpu().numpy()
-        self.threshold = float(np.percentile(scores, self.cfg.threshold_percentile))
+    def _scores(self, images: list[np.ndarray], batch_size: int = 16) -> np.ndarray:
+        """Raw (un-normalised) image scores against the current memory bank."""
+        raw = [self._raw_map(self.preprocess(images[i:i + batch_size])) for i in range(0, len(images), batch_size)]
+        return torch.cat([m.flatten(1).max(dim=1).values for m in raw]).cpu().numpy()
+
+    def _kfold_threshold(self, images: list[np.ndarray], batch_size: int = 16, k: int = 5) -> float:
+        """Score every image against a bank built without it (k folds), then take the percentile."""
+        full, scores = self.memory_bank, []
+        for f in range(k):
+            held = images[f::k]
+            rest = [im for i, im in enumerate(images) if i % k != f]
+            if not held or not rest:
+                continue
+            self.memory_bank = self._bank(rest, batch_size)
+            scores.append(self._scores(held, batch_size))
+        self.memory_bank = full
+        return float(np.percentile(np.concatenate(scores), self.cfg.threshold_percentile))
 
     # ---------- inference ----------
 

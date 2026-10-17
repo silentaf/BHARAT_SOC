@@ -18,3 +18,4 @@ onnxscript
 onnxruntime
 huggingface_hub
 pytest
+markdown          # scripts/build_report.py (report PDF)
