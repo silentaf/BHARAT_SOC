@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import json
 import time
+from functools import lru_cache
 
+import cv2
+import numpy as np
 from flask import Flask, Response, jsonify, request
 
 from .inspector import Inspector
@@ -18,6 +21,19 @@ def create_app(inspector: Inspector) -> Flask:
     @app.get("/")
     def index():
         return PAGE
+
+    # "Add to Home screen" on a phone installs the dashboard as a full-screen app.
+    @app.get("/manifest.webmanifest")
+    def manifest():
+        return jsonify(name="QC-Assist", short_name="QC-Assist", start_url="/", display="standalone",
+                       background_color="#0f1418", theme_color="#0f1418",
+                       icons=[{"src": f"/icon-{n}.png", "sizes": f"{n}x{n}", "type": "image/png"} for n in (192, 512)])
+
+    @app.get("/icon-<int:size>.png")
+    def icon(size):
+        if size not in (192, 512):
+            return Response(status=404)
+        return Response(_icon_png(size), mimetype="image/png")
 
     @app.get("/stream")
     def stream():
@@ -96,9 +112,22 @@ def create_app(inspector: Inspector) -> Flask:
     return app
 
 
+@lru_cache(maxsize=2)
+def _icon_png(size: int) -> bytes:
+    """App icon drawn at startup: dark tile, green check ring, "QC"."""
+    img = np.full((size, size, 3), (24, 20, 15), np.uint8)  # BGR #0f1418
+    c, r = size // 2, int(size * 0.36)
+    cv2.circle(img, (c, c), r, (67, 160, 46), max(2, size // 24), cv2.LINE_AA)  # #2ea043
+    scale, thick = size / 110, max(2, size // 30)
+    (w, h), _ = cv2.getTextSize("QC", cv2.FONT_HERSHEY_DUPLEX, scale, thick)
+    cv2.putText(img, "QC", (c - w // 2, c + h // 2), cv2.FONT_HERSHEY_DUPLEX, scale, (243, 237, 230), thick, cv2.LINE_AA)
+    return cv2.imencode(".png", img)[1].tobytes()
+
+
 PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>QC-Assist</title>
+<title>QC-Assist</title><link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0f1418"><link rel="icon" href="/icon-192.png">
 <style>
 :root{--bg:#0f1418;--panel:#182027;--line:#26313a;--text:#e6edf3;--muted:#8b98a5;
 --ok:#2ea043;--minor:#d29922;--major:#f0883e;--critical:#f85149;--accent:#58a6ff}

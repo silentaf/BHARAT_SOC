@@ -23,9 +23,23 @@ def list_images(folder: str | Path) -> list[Path]:
 
 
 def frames(source: str) -> Iterator[tuple[str, np.ndarray]]:
-    """Yields (name, RGB frame). `source` is an image folder or a camera index like "0"."""
-    if source.isdigit():
-        cap = cv2.VideoCapture(int(source))
+    """Yields (name, RGB frame). `source` is an image folder, a camera index like "0", a
+    snapshot URL ending in .jpg (e.g. the IP Webcam app on a phone: http://127.0.0.1:8080/shot.jpg)
+    or a video stream URL."""
+    if source.startswith(("http://", "https://")) and source.lower().endswith((".jpg", ".jpeg")):
+        # One fresh snapshot per inspection: never a stale frame from a buffered stream.
+        import urllib.request
+        i = 0
+        while True:
+            with urllib.request.urlopen(source, timeout=5) as r:
+                frame = cv2.imdecode(np.frombuffer(r.read(), np.uint8), cv2.IMREAD_COLOR)
+            if frame is None:
+                raise RuntimeError(f"no image from {source}")
+            yield f"cam_{i:06d}", cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            i += 1
+    elif source.isdigit() or "://" in source:
+        cap = cv2.VideoCapture(int(source) if source.isdigit() else source)
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # prefer the newest frame
         if not cap.isOpened():
             raise RuntimeError(f"cannot open camera {source}")
         i = 0

@@ -9,6 +9,15 @@ running on-device through ExecuTorch** — fully offline, nothing leaves the fac
 
 ![QC-Assist operator dashboard: a VisA PCB with bent pins outlined in red, classified MAJOR, type "bent", with Llama advice](docs/images/dashboard.png)
 
+## Deliverables (PS5)
+
+| Deliverable | Where |
+|---|---|
+| Source code | this repository |
+| Application | `python -m qc_assist`: the operator app (live camera, defect + type + severity, Llama advice, log, shift report, questions, teach a new board). Runs on a laptop, an Android phone ([`docs/phone.md`](docs/phone.md)) or a Raspberry Pi 5 |
+| Demonstration video | [link to be added] · script: [`docs/demo_script.md`](docs/demo_script.md) |
+| Technical report | [`docs/technical_report.md`](docs/technical_report.md) (PDF: `python scripts/build_report.py`) |
+
 ## Results so far (laptop — Raspberry Pi 5 numbers next)
 
 VisA PCB categories, official one-class split (100 good + 100 defective test boards each),
@@ -43,6 +52,7 @@ deterministic text ([`results/x86_64/llama_VLSI.json`](results/x86_64/llama_VLSI
 | Operator dashboard (offline), teach a new board from 20 good boards (3 s on the laptop) | working |
 | Llama 3.2 1B via ExecuTorch (`TextLLMRunner`, 8da4w, XNNPACK), EN + HI, output checks | working, benchmarked on laptop |
 | Hailo: ONNX → INT8 → HEF (DFC 5.4, Hailo-10H), INT8 accuracy in emulator | working; HailoRT run in Phase 2 |
+| Android phone (Arm CPU) runs | setup ready ([`docs/phone.md`](docs/phone.md)), measurements pending |
 | Raspberry Pi 5 / AI HAT+ 2 runs | pending our hardware |
 
 Phase 1 report: [`docs/technical_report.md`](docs/technical_report.md) (PDF: `python scripts/build_report.py`).
@@ -103,6 +113,9 @@ as the PS5 rules require.
 | `docs/technical_report.md` | Phase 1 technical report (draft) |
 | `PLAN.md` | Phase 1 plan and deliverables checklist |
 | `scripts/demo.py` | demo scenes for the video (`inspect`, `teach`) |
+| `qc_assist/__main__.py` | the application entry point (`python -m qc_assist`) |
+| `scripts/make_bundle.sh`, `scripts/setup_arm.sh`, `scripts/arm_benchmarks.sh` | move models + test data to an Arm device, set it up, run every benchmark |
+| `docs/phone.md` | running on an Android phone (Termux + Ubuntu, phone camera) |
 | `scripts/build_report.py` | technical report → PDF |
 
 ## Demo
@@ -144,7 +157,14 @@ Train, benchmark, inspect:
 .venv/bin/python scripts/run_inspection.py --model models/pcb1.pt --source data/visa/pcb1/test
 ```
 
-Operator dashboard (open http://localhost:8000):
+The application (defaults in `configs/default.yaml`, section `app`), then open http://127.0.0.1:8000:
+
+```bash
+.venv/bin/python -m qc_assist                                     # laptop camera, pcb1 model
+.venv/bin/python -m qc_assist --source http://127.0.0.1:8080/shot.jpg   # phone camera (IP Webcam app)
+```
+
+The same dashboard with explicit options (open http://localhost:8000):
 
 ```bash
 .venv/bin/python scripts/dashboard.py --source 0 --model models/pcb1.pt                 # camera

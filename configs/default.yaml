@@ -25,3 +25,11 @@ llama:
   temperature: 0.2
 
 log_db: outputs/inspections.sqlite
+
+app:                   # defaults for `python -m qc_assist` (each can be overridden on the command line)
+  source: "0"          # camera index, image folder, or a phone camera snapshot URL
+                       # (IP Webcam app: http://127.0.0.1:8080/shot.jpg)
+  model: models/pcb1.pt  # missing file -> starts with no model; use "Teach a new board"
+  backend: onnx        # onnx (ONNX Runtime, faster on CPU) | torch | hailo; falls back to torch without the .onnx
+  host: 127.0.0.1      # 0.0.0.0 to open the dashboard from another device on the network
+  port: 8000
