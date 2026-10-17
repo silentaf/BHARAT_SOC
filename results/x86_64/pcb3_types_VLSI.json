@@ -1,0 +1,38 @@
+{
+  "model": "pcb3.pt",
+  "host": "VLSI",
+  "machine": "x86_64",
+  "n_defects": 100,
+  "types": {
+    "bent": 19,
+    "melt": 43,
+    "missing": 16,
+    "scratch": 22
+  },
+  "left_out_types": {},
+  "cv": "5x stratified 5-fold",
+  "accuracy": 0.8200000000000001,
+  "accuracy_std": 0.03633180424916988,
+  "balanced_accuracy": 0.7889002865249805,
+  "majority_baseline": 0.43,
+  "confident_coverage": 0.8379999999999999,
+  "confident_accuracy": 0.8761574348537116,
+  "confusion_true_pred": {
+    "bent -> bent": 79,
+    "bent -> melt": 12,
+    "bent -> scratch": 4,
+    "melt -> bent": 11,
+    "melt -> melt": 185,
+    "melt -> missing": 8,
+    "melt -> scratch": 11,
+    "missing -> bent": 1,
+    "missing -> melt": 17,
+    "missing -> missing": 53,
+    "missing -> scratch": 9,
+    "scratch -> bent": 1,
+    "scratch -> melt": 17,
+    "scratch -> missing": 19,
+    "scratch -> scratch": 73
+  },
+  "saved_to": "pcb3.pt"
+}

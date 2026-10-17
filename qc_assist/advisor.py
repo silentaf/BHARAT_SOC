@@ -33,6 +33,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
+from .defect_types import TYPE_HI, type_text
 from .severity import Verdict
 
 LANGUAGES = {"en": "English", "hi": "हिंदी"}
@@ -70,8 +71,9 @@ def region_text(region: str, lang: str) -> str:
 def policy_line(verdict: Verdict, lang: str = "en") -> str:
     """First line of every advisory: severity, location and the required action."""
     sev = SEVERITY_NAME[lang][verdict.severity]
+    kind = f" ({type_text(verdict.defect_type, lang)})" if verdict.defect_type else ""
     where = region_text(verdict.region, lang)
-    return f"{sev} {DEFECT_WORD[lang]} · {where} · {verdict.area_pct:.1f}% — {ACTION[lang][verdict.severity]}"
+    return f"{sev} {DEFECT_WORD[lang]}{kind} · {where} · {verdict.area_pct:.1f}% — {ACTION[lang][verdict.severity]}"
 
 
 # ---- facts given to Llama ----------------------------------------------------------------
@@ -98,10 +100,11 @@ def verdict_facts(product: str, verdict: Verdict, lang: str = "en", recent_defec
                   defect_type: str | None = None) -> str:
     sev = SEVERITY_NAME[lang][verdict.severity].lower()
     where = region_text(verdict.region, lang)
+    defect_type = defect_type or verdict.defect_type
     if lang == "hi":
         facts = [f"बोर्ड: {product}.", f"परिणाम: {sev} दोष.", f"जगह: {where}.", f"आकार: बोर्ड का {verdict.area_pct:.1f}%."]
         if defect_type:
-            facts.append(f"दोष का प्रकार: {defect_type}.")
+            facts.append(f"दोष का प्रकार: {type_text(defect_type, 'hi')}.")
     else:
         facts = [f"Board: {product}.", f"Result: {sev} defect.", f"Location: {where}.",
                  f"Size: {verdict.area_pct:.1f}% of the board."]
@@ -133,6 +136,10 @@ def stats_facts(stats: dict, lang: str = "en") -> str:
     if stats.get("top_defect_regions"):
         parts.append("Defects by location: " + ", ".join(
             f"{where(r['region'])} {r['count']}" for r in stats["top_defect_regions"]) + ".")
+    if stats.get("defect_types"):
+        # English type names even for Hindi replies: with Hindi names the model's output split a
+        # Devanagari character across tokens, which the ExecuTorch runner binding cannot decode.
+        parts.append("Defect types: " + ", ".join(f"{t['type']} {t['count']}" for t in stats["defect_types"]) + ".")
     hourly = [h for h in stats.get("hourly", []) if h["inspected"]]
     if hourly:
         parts.append("Defect rate by hour: " + ", ".join(
@@ -147,7 +154,8 @@ def stats_facts(stats: dict, lang: str = "en") -> str:
         parts.append("Shift rating: GOOD (no critical defects, defect rate not rising).")
     if stats.get("recent_defects"):
         parts.append("Recent defects: " + ", ".join(
-            f"#{d['id']} {d['severity']} {where(d['region'])}" for d in stats["recent_defects"][:5]) + ".")
+            f"#{d['id']} {d['severity']}" + (f" {d['defect_type']}" if d.get("defect_type") else "")
+            + f" {where(d['region'])}" for d in stats["recent_defects"][:5]) + ".")
     return " ".join(parts)
 
 
@@ -157,12 +165,14 @@ EXAMPLE_GOOD = {
     "product": "pcb4", "inspected": 380, "defective": 8, "defect_rate_pct": 2.1,
     "by_severity": {"ok": 372, "minor": 6, "major": 2, "critical": 0},
     "top_defect_regions": [{"region": "centre", "count": 5}, {"region": "top-left", "count": 2}],
+    "defect_types": [{"type": "scratch", "count": 5}, {"type": "melt", "count": 3}],
     "hourly": [{"hour": "14:00", "inspected": 200, "defective": 4}, {"hour": "15:00", "inspected": 180, "defective": 4}],
 }
 EXAMPLE_POOR = {
     "product": "pcb2", "inspected": 290, "defective": 31, "defect_rate_pct": 10.7,
     "by_severity": {"ok": 259, "minor": 15, "major": 12, "critical": 4},
     "top_defect_regions": [{"region": "bottom-right", "count": 14}, {"region": "top-left", "count": 6}],
+    "defect_types": [{"type": "missing", "count": 19}, {"type": "bent", "count": 12}],
     "hourly": [{"hour": "22:00", "inspected": 150, "defective": 9}, {"hour": "23:00", "inspected": 140, "defective": 22}],
 }
 
@@ -174,18 +184,20 @@ PROMPTS = {
         "en": ("You help operators on a printed-circuit-board assembly line. Reply with one or two short "
                "sentences: what to look for at the defect location and the usual cause. Never decide the "
                "action or about stopping the line.",
-               [("Board: pcb2. Result: minor defect. Location: bottom-left. Size: 0.6% of the board.",
+               [("Board: pcb2. Result: minor defect. Location: bottom-left. Size: 0.6% of the board. "
+                 "Defect type: scratch.",
                  "Look for a small scratch or flux residue near the bottom-left components. This is usually "
                  "handling damage or incomplete cleaning after soldering."),
-                ("Board: pcb4. Result: critical defect. Location: centre. Size: 4.2% of the board.",
+                ("Board: pcb4. Result: critical defect. Location: centre. Size: 4.2% of the board. "
+                 "Defect type: missing.",
                  "Look for a missing or shifted component in the centre of the board. This is often caused by "
                  "a pick-and-place nozzle or feeder problem.")]),
         "hi": ("आप एक PCB असेंबली लाइन पर ऑपरेटर की मदद करते हैं। एक या दो छोटे वाक्यों में सरल हिंदी में "
                "बताइए कि दोष वाली जगह पर क्या देखना है और इसका सामान्य कारण क्या है।",
-               [("बोर्ड: pcb2. परिणाम: मामूली दोष. जगह: नीचे-बाएँ. आकार: बोर्ड का 0.6%.",
+               [("बोर्ड: pcb2. परिणाम: मामूली दोष. जगह: नीचे-बाएँ. आकार: बोर्ड का 0.6%. दोष का प्रकार: खरोंच.",
                  "नीचे-बाएँ हिस्से के पुर्ज़ों के पास छोटी खरोंच या फ्लक्स का अवशेष देखें। यह आमतौर पर "
                  "हैंडलिंग से नुकसान या सोल्डरिंग के बाद अधूरी सफ़ाई से होता है।"),
-                ("बोर्ड: pcb4. परिणाम: गंभीर दोष. जगह: बीच में. आकार: बोर्ड का 4.2%.",
+                ("बोर्ड: pcb4. परिणाम: गंभीर दोष. जगह: बीच में. आकार: बोर्ड का 4.2%. दोष का प्रकार: गायब पुर्ज़ा.",
                  "बीच के हिस्से में कोई गायब या खिसका हुआ पुर्ज़ा देखें। यह अक्सर पिक-एंड-प्लेस मशीन की "
                  "नोज़ल की गड़बड़ी से होता है।")]),
     },
@@ -202,17 +214,19 @@ IN_HINDI = " Reply in simple Hindi (Devanagari script)."
 # fixed example the 1B model copied its verdict ("good shift, stable") onto bad shifts.
 REPORT_EXAMPLES = {
     ("good", "en"): "pcb4 had a good shift: 8 of 380 boards were defective (2.1%), with no critical defects and a "
-                    "stable defect rate. Most defects were in the centre (5). Check the components in the centre "
+                    "stable defect rate. Most defects were in the centre (5), and the most common type was scratch (5). "
+                    "Check the components in the centre "
                     "of the board at the start of the next shift.",
     ("poor", "en"): "pcb2 had a poor shift: 31 of 290 boards were defective (10.7%), including 4 critical defects, "
-                    "and the defect rate rose from 6.0% to 15.7%. Most defects were in the bottom-right (14). "
+                    "and the defect rate rose from 6.0% to 15.7%. Most defects were in the bottom-right (14), and the most "
+                    "common type was missing (19). "
                     "Inspect the station that places the bottom-right components before the next shift.",
     ("good", "hi"): "pcb4 की शिफ्ट अच्छी रही: 380 में से 8 बोर्ड दोषपूर्ण थे (2.1%), कोई गंभीर दोष नहीं था और दोष "
-                    "दर स्थिर रही। ज़्यादातर दोष बीच में थे (5)। अगली शिफ्ट की शुरुआत में बोर्ड के बीच वाले "
+                    "दर स्थिर रही। ज़्यादातर दोष बीच में थे (5), और सबसे आम प्रकार scratch था (5)। अगली शिफ्ट की शुरुआत में बोर्ड के बीच वाले "
                     "पुर्ज़ों की जाँच करें।",
     ("poor", "hi"): "pcb2 की शिफ्ट खराब रही: 290 में से 31 बोर्ड दोषपूर्ण थे (10.7%), जिनमें 4 गंभीर दोष थे, और "
-                    "दोष दर 6.0% से बढ़कर 15.7% हो गई। ज़्यादातर दोष नीचे-दाएँ थे (14)। अगली शिफ्ट से पहले "
-                    "नीचे-दाएँ पुर्ज़े लगाने वाले स्टेशन की जाँच करें।",
+                    "दोष दर 6.0% से बढ़कर 15.7% हो गई। ज़्यादातर दोष नीचे-दाएँ थे (14), और सबसे आम प्रकार missing था (19)। "
+                    "अगली शिफ्ट से पहले नीचे-दाएँ पुर्ज़े लगाने वाले स्टेशन की जाँच करें।",
 }
 ANSWER_EXAMPLES = {
     "en": [("Where are most defects?", "Most defects are in the bottom-right (14), followed by the top-left (6)."),
@@ -279,6 +293,7 @@ def fallback_report(stats: dict, lang: str = "en") -> str:
     t, first, last = trend(stats)
     top = ", ".join(f"{region_text(r['region'], lang)} ({r['count']})" for r in stats.get("top_defect_regions", []))
     tr = TREND_WORD[lang][t] + (f" ({first:.1f}% → {last:.1f}%)" if first is not None else "")
+    kinds = ", ".join(f"{type_text(d['type'], lang)} ({d['count']})" for d in stats.get("defect_types", []))
     if lang == "hi":
         lines = [f"{stats['product']}: {stats['inspected']} जाँचे गए, {stats['defective']} दोषपूर्ण "
                  f"({stats['defect_rate_pct']}%).",
@@ -286,6 +301,8 @@ def fallback_report(stats: dict, lang: str = "en") -> str:
                  f"रुझान: {tr}।"]
         if top:
             lines.append(f"सबसे ज़्यादा दोष: {top}।")
+        if kinds:
+            lines.append(f"दोष के प्रकार: {kinds}।")
     else:
         lines = [f"{stats['product']}: {stats['inspected']} inspected, {stats['defective']} defective "
                  f"({stats['defect_rate_pct']}%).",
@@ -293,6 +310,8 @@ def fallback_report(stats: dict, lang: str = "en") -> str:
                  f"Trend: {tr.lower()}."]
         if top:
             lines.append(f"Most frequent defect locations: {top}.")
+        if kinds:
+            lines.append(f"Defect types: {kinds}.")
     return " ".join(lines)
 
 
@@ -305,6 +324,8 @@ OUT_OF_SCOPE = {
     "hi": "जाँच लॉग में बोर्ड, दोष, गंभीरता, जगह और समय दर्ज होते हैं, लोग नहीं, इसलिए मैं इसका जवाब नहीं दे सकता।",
 }
 
+HINDI_FIGURES = "लॉग के आँकड़े: "
+
 NO_ANSWER = {"en": "Llama could not answer this reliably from the log. Current figures: ",
              "hi": "Llama लॉग से इसका भरोसेमंद जवाब नहीं दे सका। अभी के आँकड़े: "}
 
@@ -315,8 +336,10 @@ _NUM = re.compile(r"(?<![A-Za-z])\d+(?:\.\d+)?")
 _DEVANAGARI_DIGITS = str.maketrans("०१२३४५६७८९", "0123456789")
 
 
-def _numbers(text: str) -> set[float]:
-    return {float(n) for n in _NUM.findall(text.translate(_DEVANAGARI_DIGITS))}
+def _numbers(text: str) -> set[str]:
+    """Numbers exactly as written: "3.0" does not match a "3" in the facts (a 1B model wrote
+    "3.0%" for a 2.9% rate, and the check must not accept it because 3 critical defects exist)."""
+    return set(_NUM.findall(text.translate(_DEVANAGARI_DIGITS)))
 
 
 # Words that contradict a fact (English matched lower-case). A 1B model copies wording from its
@@ -347,6 +370,32 @@ def _locations(text: str) -> set[str]:
     return found
 
 
+# Names whose counts appear in the facts: board locations and defect types, English and Hindi.
+_TYPE_NAMES = [(t, t) for t in TYPE_HI] + [(t, h) for t, h in TYPE_HI.items()]
+_COUNT_AFTER = r"\W{0,3}(?:था|थे|थी|हैं|है|was|were|with)?\W{0,3}(\d+)(?![\d.%])"
+
+
+def _count_pairs(stats: dict) -> dict[str, int]:
+    pairs = {r["region"]: r["count"] for r in stats.get("top_defect_regions", [])}
+    pairs.update({t["type"]: t["count"] for t in stats.get("defect_types", [])})
+    return pairs
+
+
+def _wrong_counts(text: str, stats: dict) -> list[str]:
+    """'top-right (9)' or 'missing था (10)' must match the count in the facts."""
+    known, low, wrong = _count_pairs(stats), text.lower(), []
+    for key, name in _LOCATIONS + _TYPE_NAMES:
+        for m in re.finditer(re.escape(name) + _COUNT_AFTER, low):
+            if key in known and int(m.group(1)) != known[key]:
+                wrong.append(f"{name} {m.group(1)} (facts: {known[key]})")
+    return wrong
+
+
+def _types(text: str) -> set[str]:
+    low = text.lower()
+    return {key for key, name in _TYPE_NAMES if re.search(r"(?<![a-z])" + re.escape(name), low)}
+
+
 def check_output(text: str, facts: str, stats: dict | None = None, defect_present: bool = False) -> str | None:
     """Reason to reject a generation, or None if it is usable."""
     if not text.strip():
@@ -355,7 +404,7 @@ def check_output(text: str, facts: str, stats: dict | None = None, defect_presen
         return "incomplete (token limit reached)"
     extra = _numbers(text) - _numbers(facts)
     if extra:
-        return "numbers not in the facts: " + ", ".join(f"{n:g}" for n in sorted(extra))
+        return "numbers not in the facts: " + ", ".join(sorted(extra))
     extra_loc = _locations(text) - _locations(facts)
     if extra_loc:
         return "locations not in the facts: " + ", ".join(sorted(extra_loc))
@@ -364,6 +413,12 @@ def check_output(text: str, facts: str, stats: dict | None = None, defect_presen
         if hit:
             return f"contradicts the facts (defect_present): '{hit}'"
     if stats:
+        wrong = _wrong_counts(text, stats)
+        if wrong:
+            return "counts do not match the facts: " + ", ".join(wrong)
+        extra_types = _types(text) - {d["type"] for d in stats.get("defect_types", [])}
+        if extra_types:
+            return "defect types not in the facts: " + ", ".join(sorted(extra_types))
         t = trend(stats)[0]
         rules = [t] if t in CONTRADICTS else []
         if stats["by_severity"]["critical"]:
@@ -395,6 +450,10 @@ def clean_output(text: str) -> str:
     return text
 
 
+class GenerationError(RuntimeError):
+    """Llama produced no usable text (the caller falls back to deterministic text)."""
+
+
 @dataclass
 class LLMResult:
     text: str
@@ -416,6 +475,7 @@ class LlamaAdvisor:
         self._pool = ThreadPoolExecutor(max_workers=1)
         self._et_runner = None
         self.last_stats: dict | None = None  # prefill/decode speed of the latest call, for the report
+        self.calls = 0                       # generation attempts (for benchmarks)
 
     @classmethod
     def from_config(cls, llama_cfg: dict, root: Path | None = None) -> "LlamaAdvisor":
@@ -442,6 +502,7 @@ class LlamaAdvisor:
         return True
 
     def generate(self, prompt: str, max_new_tokens: int | None = None) -> str:
+        self.calls += 1
         if self.runtime == "python":
             return self._generate_python(prompt, max_new_tokens or self.max_new_tokens)
         return self._generate_binary(prompt)
@@ -467,7 +528,13 @@ class LlamaAdvisor:
         self._et_runner.reset()  # every prompt is self-contained; start from an empty KV cache
         cfg = GenerationConfig(echo=False, max_new_tokens=max_new_tokens, seq_len=self.max_seq_len,
                                temperature=self.temperature)
-        self._et_runner.generate(prompt, cfg, token_callback=pieces.append, stats_callback=on_stats)
+        try:
+            self._et_runner.generate(prompt, cfg, token_callback=pieces.append, stats_callback=on_stats)
+        except UnicodeDecodeError as e:
+            # The runner passes every token to Python as UTF-8 text. Llama 3's byte-level tokenizer
+            # can split one Devanagari character across two tokens, which the binding cannot decode,
+            # and generation stops. Seen in Hindi reports; the caller shows deterministic text.
+            raise GenerationError("a token ended inside a UTF-8 character (Hindi)") from e
         if stats:
             stats["prefill_tok_s"] = round(1000 * stats["prompt_tokens"] / max(stats["prefill_ms"], 1), 1)
             stats["decode_tok_s"] = round(1000 * max(stats["generated_tokens"] - 1, 0) / max(stats["decode_ms"], 1), 1)
@@ -486,10 +553,14 @@ class LlamaAdvisor:
         out = subprocess.run(cmd, capture_output=True, text=True, timeout=self.timeout_s, check=True).stdout
         return _strip_runner_output(out, prompt)
 
-    def _checked(self, task: str, facts: str, lang: str, max_new_tokens: int) -> tuple[str | None, str | None]:
+    def _llama(self, prompt: str, max_new_tokens: int, facts: str, stats: dict | None = None,
+               defect_present: bool = False) -> tuple[str | None, str | None]:
         """(text, None) if Llama's output passes the checks, else (None, reason)."""
-        text = clean_output(self.generate(task_prompt(task, facts, lang), max_new_tokens))
-        reason = check_output(text, facts, defect_present=task == "advise")
+        try:
+            text = clean_output(self.generate(prompt, max_new_tokens))
+        except GenerationError as e:
+            return None, str(e)
+        reason = check_output(text, facts, stats, defect_present)
         return (None, reason) if reason else (text, None)
 
     def advise(self, product: str, verdict: Verdict, lang: str = "en", recent_defect_rate: float | None = None,
@@ -498,15 +569,14 @@ class LlamaAdvisor:
         if not self.available:
             return LLMResult(head, "fallback")
         facts = verdict_facts(product, verdict, lang, recent_defect_rate, defect_type)
-        text, why = self._checked("advise", facts, lang, 90)
+        text, why = self._llama(task_prompt("advise", facts, lang), 90, facts, defect_present=True)
         return LLMResult(f"{head}\n{text}", "llama-executorch") if text else LLMResult(head, "template", why)
 
     def report(self, stats: dict, lang: str = "en") -> LLMResult:
         if not self.available or not stats["inspected"]:
             return LLMResult(fallback_report(stats, lang), "fallback")
         prompt, facts = report_prompt(stats, lang)
-        text = clean_output(self.generate(prompt, 140))
-        why = check_output(text, facts, stats)
+        text, why = self._llama(prompt, 140, facts, stats)
         return LLMResult(fallback_report(stats, lang), "template", why) if why else LLMResult(text, "llama-executorch")
 
     def answer(self, question: str, stats: dict, lang: str = "en") -> LLMResult:
@@ -514,9 +584,14 @@ class LlamaAdvisor:
             return LLMResult(OUT_OF_SCOPE.get(lang, OUT_OF_SCOPE["en"]), "template", "question about people")
         if not self.available:
             return LLMResult(NO_ANSWER[lang] + fallback_report(stats, lang), "fallback")
+        if lang == "hi":
+            # Measured: Llama 3.2 1B's Hindi answers failed the checks or were wrong in every
+            # benchmark run (wrong locations, all types called "melt"), so Hindi questions get
+            # the exact figures from the log instead.
+            return LLMResult(HINDI_FIGURES + fallback_report(stats, lang), "template",
+                             "Hindi questions are answered from the log figures")
         prompt, facts = answer_prompt(question, stats, lang)
-        text = clean_output(self.generate(prompt, 110))
-        why = check_output(text, facts + " " + question, stats)
+        text, why = self._llama(prompt, 110, facts + " " + question, stats)
         if why:
             return LLMResult(NO_ANSWER[lang] + fallback_report(stats, lang), "template", why)
         return LLMResult(text, "llama-executorch")

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 
 from flask import Flask, Response, jsonify, request
@@ -33,6 +34,16 @@ def create_app(inspector: Inspector) -> Flask:
                 time.sleep(0.03)
         return Response(gen(), mimetype="multipart/x-mixed-replace; boundary=frame")
 
+    @app.get("/api/frame")
+    def frame():
+        # The newest annotated frame plus its verdict in a header, so the page updates the image
+        # and the text together (an MJPEG <img> rendered one frame behind the polled stats).
+        f = inspector.wait_frame(int(request.args.get("after", 0)))
+        if f is None:
+            return Response(status=204)
+        return Response(f[1], mimetype="image/jpeg",
+                        headers={"X-Frame": json.dumps(f[2], ensure_ascii=True), "Cache-Control": "no-store"})
+
     @app.get("/api/state")
     def state():
         return jsonify(inspector.snapshot())
@@ -62,7 +73,7 @@ def create_app(inspector: Inspector) -> Flask:
             return jsonify(error="empty question"), 400
         stats = inspector.log.summary(inspector.product, time.time() - 8 * 3600)
         stats["recent_defects"] = [
-            {k: r[k] for k in ("id", "severity", "region", "area_pct")}
+            {k: r[k] for k in ("id", "severity", "region", "defect_type", "area_pct")}
             for r in inspector.log.recent(inspector.product, 50) if r["severity"] != "ok"
         ][:10]
         t0 = time.perf_counter()
@@ -123,8 +134,8 @@ button{cursor:pointer}button:hover{border-color:var(--accent)}button.primary{bac
 <button id="lang">EN / हिंदी</button></header>
 <main>
 <section class="col">
- <div class="card"><img id="video" src="/stream" alt="live inspection">
-  <div class="verdict"><span class="sev" id="sev">-</span>
+ <div class="card"><img id="video" alt="live inspection">
+  <div class="verdict"><span class="sev" id="sev">-</span><span class="metric">type <b id="dtype">-</b></span>
    <span class="metric">score <b id="score">-</b></span>
    <span class="metric">vision <b id="ms">-</b> ms</span>
    <span class="metric">fps <b id="fps">-</b></span>
@@ -151,12 +162,20 @@ async function tick(){
  try{const s=await (await fetch('/api/state')).json();
   $('product').textContent=s.product;$('llm').textContent=s.llama?'Llama 3.2 · ExecuTorch':'Llama not configured (fallback)';
   $('lang').textContent=s.lang==='hi'?'हिंदी':'English';
-  const sev=s.severity||'-';$('sev').textContent=sev.toUpperCase();$('sev').className='sev sev-'+sev;
-  $('score').textContent=s.score??'-';$('ms').textContent=s.vision_ms??'-';$('fps').textContent=s.fps??'-';
-  $('status').textContent=s.status||'';$('teachst').textContent=s.teach||'';
-  if(s.advisories.length)$('advs').innerHTML=s.advisories.map(a=>`<div class="adv"><div class="meta">#${a.id} · ${a.time} · <span class="sev-${a.severity}">${a.severity}</span> · ${esc(a.region)} <span class="src ${a.source}" title="${esc(a.note||'')}">${a.source}</span></div><p>${esc(a.text)}</p></div>`).join('');
+  $('teachst').textContent=s.teach||'';
+  if(s.advisories.length)$('advs').innerHTML=s.advisories.map(a=>`<div class="adv"><div class="meta">#${a.id} · ${a.time} · <span class="sev-${a.severity}">${a.severity}</span> · ${esc(a.defect_type||'unclassified')} · ${esc(a.region)} <span class="src ${a.source}" title="${esc(a.note||'')}">${a.source}</span></div><p>${esc(a.text)}</p></div>`).join('');
  }catch(e){}
 }
+function verdict(s){const sev=s.severity||'-';$('sev').textContent=sev.toUpperCase();$('sev').className='sev sev-'+sev;
+ $('dtype').textContent=s.severity&&s.severity!=='ok'?(s.defect_type||'unclassified'):'-';$('score').textContent=s.score??'-';
+ $('ms').textContent=s.vision_ms??'-';$('fps').textContent=s.fps??'-';$('status').textContent=s.status||''}
+const pause=ms=>new Promise(r=>setTimeout(r,ms));
+async function frames(){let id=0;const img=$('video');
+ for(;;){try{const r=await fetch('/api/frame?after='+id,{cache:'no-store'});
+  if(r.status!==200){await pause(200);continue}
+  const st=JSON.parse(r.headers.get('X-Frame')),url=URL.createObjectURL(await r.blob()),old=img.src;
+  await new Promise(done=>{img.onload=img.onerror=done;img.src=url});
+  if(old.startsWith('blob:'))URL.revokeObjectURL(old);id=st.id;verdict(st)}catch(e){await pause(1000)}}}
 async function stats(){try{const s=await (await fetch('/api/summary')).json();
  $('n').textContent=s.inspected;$('rate').textContent=s.defect_rate_pct+'%';$('crit').textContent=s.by_severity.critical;$('maj').textContent=s.by_severity.major}catch(e){}}
 async function llm(url,body){$('answer').textContent='Llama is thinking...';
@@ -167,5 +186,5 @@ $('report').onclick=()=>llm('/api/report');
 $('lang').onclick=async()=>{const s=await (await fetch('/api/state')).json();await post('/api/lang',{lang:s.lang==='hi'?'en':'hi'});tick()};
 $('teach').onclick=()=>post('/api/teach',{n:20});
 $('teachf').onclick=async()=>{const r=await post('/api/teach',{folder:$('folder').value});if(r.error)$('teachst').textContent=r.error};
-setInterval(tick,500);setInterval(stats,3000);tick();stats();
+setInterval(tick,500);setInterval(stats,3000);tick();stats();frames();
 </script></body></html>"""

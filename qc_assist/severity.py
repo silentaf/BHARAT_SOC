@@ -22,6 +22,7 @@ class Verdict:
     area_pct: float                          # % of the image flagged as anomalous
     bbox: tuple[int, int, int, int] | None   # x0, y0, x1, y1 in anomaly-map pixels
     region: str                              # e.g. "top-left", for the advisory prompt
+    defect_type: str | None = None           # e.g. "missing", when the product has a type model
 
 
 def assess(pred: Prediction, minor_area_pct: float = 0.5, major_area_pct: float = 3.0,
@@ -41,7 +42,7 @@ def assess(pred: Prediction, minor_area_pct: float = 0.5, major_area_pct: float 
         severity = "major" if pred.score >= 1.5 else "minor"
     else:
         severity = "minor"
-    return Verdict(severity, pred.score, area_pct, bbox, region)
+    return Verdict(severity, pred.score, area_pct, bbox, region, pred.defect_type)
 
 
 def _region_name(center: tuple[float, float]) -> str:

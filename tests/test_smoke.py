@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from qc_assist import advisor as adv_mod
 from qc_assist.advisor import LlamaAdvisor, build_prompt
 from qc_assist.anomaly import DetectorConfig, PatchCore
+from qc_assist.defect_types import DefectTypeClassifier
 from qc_assist.inspection_log import InspectionLog
 from qc_assist.severity import assess
 
@@ -22,7 +23,9 @@ def board(rng, defect=False):
     img[::16, :, :] = (200, 170, 60)                            # copper traces
     img[:, ::16, :] = (200, 170, 60)
     img = np.clip(img.astype(int) + rng.integers(-8, 9, img.shape), 0, 255).astype(np.uint8)
-    if defect:
+    if defect == "bright":
+        img[90:130, 100:150] = (250, 250, 250)                   # extra / misplaced part
+    elif defect:
         img[90:130, 100:150] = (10, 10, 10)                      # burn / missing component
     return img
 
@@ -41,9 +44,20 @@ def test_pipeline(tmp_path):
     assert verdict.severity in ("minor", "major", "critical")
     assert verdict.region == "centre"
 
+    # defect types: learn "dark" vs "bright" defects from a few labelled examples
+    examples = [(board(rng, defect=kind), kind) for kind in ("dark", "bright") * 6]
+    desc = np.stack([model.predict(img).descriptor for img, _ in examples])
+    model.defect_types = DefectTypeClassifier.fit(desc, [k for _, k in examples])
+    assert model.predict(board(rng, defect="bright")).defect_type == "bright"
+    assert model.predict(board(rng, defect="dark")).defect_type == "dark"
+    assert assess(model.predict(board(rng, defect="dark"))).defect_type == "dark"
+    assert model.predict(board(rng)).defect_type is None      # good boards get no type
+
     path = tmp_path / "m.pt"
     model.save(path)
-    assert abs(PatchCore.load(path).predict(board(rng, defect=True)).score - bad.score) < 0.2
+    loaded = PatchCore.load(path)
+    assert abs(loaded.predict(board(rng, defect=True)).score - bad.score) < 0.2
+    assert loaded.predict(board(rng, defect="bright")).defect_type == "bright"
 
     log = InspectionLog(tmp_path / "log.sqlite")
     row = log.add("pcb", "synthetic", verdict, 10.0)
@@ -71,6 +85,12 @@ def test_llama_output_checks():
     assert adv_mod.check_output("ज़्यादातर दोष नीचे-दाएँ थे (14)।", hi_facts, stats) is None
     assert "locations" in adv_mod.check_output("ज़्यादातर दोष ऊपर-दाएँ थे (14)।", hi_facts, stats)
     assert adv_mod.clean_output("Here is the note:\nAll good. Then the") == "All good."
+    # exact numbers, location/type counts, types that are not in the facts
+    assert "numbers" in adv_mod.check_output("The rate rose from 7% to 15.7%.", facts, stats)
+    assert "counts" in adv_mod.check_output("Most defects were in the bottom-right (6).", facts, stats)
+    assert "counts" in adv_mod.check_output("The most common type was bent (19).", facts, stats)
+    assert adv_mod.check_output("The most common type was missing (19).", facts, stats) is None
+    assert "types" in adv_mod.check_output("Most defects were scratches.", facts, stats)
 
     advisor = LlamaAdvisor(None, None, None)
     assert advisor.answer("Which operator was on shift?", stats).source == "template"

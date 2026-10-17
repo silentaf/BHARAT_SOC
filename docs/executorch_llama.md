@@ -104,19 +104,28 @@ From `results/x86_64/llama_VLSI.json` (every generated text is in that file):
 |---|---|
 | `.pte` size | 860 MB |
 | Load + first call | 6.5 s |
-| Peak RAM (whole process) | 1,469 MB |
-| Prefill | 240 tokens/s (median) |
-| Decode | 31.4 tokens/s (median) |
-| Defect advice, end to end | 2.1 s (median, English) |
+| Peak RAM (whole process) | 1,422 MB |
+| Prefill | 244 tokens/s (median) |
+| Decode | 31.0 tokens/s (median) |
+| Defect advice, end to end | 2.3 s (median) |
 
 | Task | Llama output accepted |
 |---|---|
 | Advice, English (major / critical) | 3/3, 3/3 |
-| Advice, Hindi | 2/3 |
-| Shift report, English / Hindi | 3/3, 3/3 |
+| Advice, Hindi | 3/3 |
+| Shift report, English / Hindi | 3/3, 2/3 (one "3.0%" for a 2.9% rate, caught) |
 | Question, English | 3/3 |
-| Question, Hindi | 0/3 (named locations not in the facts → Hindi figures shown instead) |
+| Question, Hindi | not sent to Llama: Hindi figures from the log (its Hindi answers were wrong in earlier runs) |
 | Question about people | answered by rule, Llama not called |
+
+Since adding defect types the advice names them ("Look for a missing component in the
+top-right corner..."), and the checks also reject a location or defect type paired with
+the wrong count, a type not in the facts, and numbers not written exactly as in the facts.
+
+Runner gotcha: `TextLLMRunner` hands each token to Python as UTF-8 text. Llama 3's tokenizer
+can split one Devanagari character across two tokens; the binding then raises
+`UnicodeDecodeError` and generation stops. `advisor.py` catches it and shows deterministic
+text; defect types are given by their English names in Hindi prompts, which avoided it.
 
 Not caught by the checks: wrong ordering words (e.g. "lowest" next to the largest count)
 when the numbers themselves are right. Seen in a live dashboard run; noted as a limitation.

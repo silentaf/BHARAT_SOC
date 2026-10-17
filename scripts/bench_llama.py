@@ -26,13 +26,17 @@ from qc_assist.advisor import LlamaAdvisor  # noqa: E402
 from qc_assist.config import load_config  # noqa: E402
 from qc_assist.severity import Verdict  # noqa: E402
 
-VERDICT = Verdict(severity="major", score=1.84, area_pct=1.9, bbox=(12, 4, 20, 11), region="top-right")
-CRITICAL = Verdict(severity="critical", score=2.6, area_pct=6.4, bbox=(14, 14, 27, 26), region="centre")
+VERDICT = Verdict(severity="major", score=1.84, area_pct=1.9, bbox=(12, 4, 20, 11), region="top-right",
+                  defect_type="missing")
+CRITICAL = Verdict(severity="critical", score=2.6, area_pct=6.4, bbox=(14, 14, 27, 26), region="centre",
+                   defect_type="melt")
 STATS = {
     "product": "pcb1", "inspected": 412, "defective": 23, "defect_rate_pct": 5.6,
     "by_severity": {"ok": 389, "minor": 11, "major": 9, "critical": 3},
     "top_defect_regions": [{"region": "top-right", "count": 9}, {"region": "centre", "count": 6},
                            {"region": "bottom-left", "count": 4}],
+    "defect_types": [{"type": "melt", "count": 10}, {"type": "missing", "count": 7},
+                     {"type": "scratch", "count": 4}, {"type": "bent", "count": 2}],
     "hourly": [{"hour": "06:00", "inspected": 140, "defective": 4},
                {"hour": "07:00", "inspected": 138, "defective": 7},
                {"hour": "08:00", "inspected": 134, "defective": 12}],
@@ -68,12 +72,12 @@ def main():
     runs = []
     for rep in range(args.repeats):
         for name, fn, a, kw in TASKS:
-            adv.last_stats = None  # stays None when the answer needs no Llama call (e.g. out-of-scope question)
+            adv.last_stats, calls = None, adv.calls
             t = time.perf_counter()
             res = getattr(adv, fn)(*a, **kw)
             wall = time.perf_counter() - t
-            llm = adv.last_stats or {}
-            runs.append({"task": name, "repeat": rep, "wall_s": round(wall, 2), "llama_called": bool(llm), **llm,
+            llm = adv.last_stats or {}  # empty when Llama was not needed or generation failed
+            runs.append({"task": name, "repeat": rep, "wall_s": round(wall, 2), "llama_called": adv.calls > calls, **llm,
                          "source": res.source, "rejected_because": res.note, "text": res.text})
             print(f"[{name} #{rep}] {wall:.1f}s  prefill {llm.get('prefill_tok_s')} tok/s  "
                   f"decode {llm.get('decode_tok_s')} tok/s  {res.source} {res.note or ''}\n{res.text}\n",
@@ -87,7 +91,7 @@ def main():
         "max_seq_len": adv.max_seq_len, "max_new_tokens": adv.max_new_tokens, "temperature": adv.temperature,
         "load_plus_first_call_s": round(load_s, 2),
         "peak_rss_mb": round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024),
-        "median": {k: statistics.median(r[k] for r in runs if r["llama_called"])
+        "median": {k: statistics.median(r[k] for r in runs if k in r)
                    for k in ("prefill_tok_s", "decode_tok_s", "prompt_tokens", "generated_tokens", "wall_s")},
         "advice_wall_s_median": statistics.median(r["wall_s"] for r in runs if r["task"].startswith("advise")),
         "llama_output_accepted": f"{sum(r['source'] == 'llama-executorch' for r in runs)}/"

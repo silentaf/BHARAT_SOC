@@ -7,7 +7,7 @@ QC-Assist inspects printed circuit boards in real time on a Raspberry Pi 5, high
 defects, rates their severity, and gives the operator advice from **Llama 3.2 1B
 running on-device through ExecuTorch** — fully offline, nothing leaves the factory floor.
 
-![QC-Assist operator dashboard: a VisA PCB with a damaged pin outlined in red](docs/images/dashboard.png)
+![QC-Assist operator dashboard: a VisA PCB with bent pins outlined in red, classified MAJOR, type "bent", with Llama advice](docs/images/dashboard.png)
 
 ## Results so far (laptop — Raspberry Pi 5 numbers next)
 
@@ -26,16 +26,20 @@ Laptop timings are from a shared, busy laptop and vary 33–47 ms per frame betw
 **On the Hailo NPU (INT8, Dataflow Compiler emulator), all four boards:** image AUROC 0.955 → 0.956
 (mean). Quantisation costs no measurable accuracy. Compiled HEFs for Hailo-10H: 3.9–4.4 MB.
 
-**Llama 3.2 1B on ExecuTorch (laptop CPU):** 860 MB `.pte`, 1.47 GB RAM, 240 tokens/s prefill,
-31 tokens/s decode, defect advice in 2.1 s. Every answer is checked against the facts before
-it is shown; 17 of 21 benchmark answers passed, and the rest were replaced by correct
+**Defect type** (melt, missing, bent, scratch; pcb4: missing, extra, dirt, damage), cross-validated:
+88% / 76% / 82% / 69% correct on pcb1–4, against 54% / 55% / 43% / 45% for always guessing the most
+common type. When unsure (< 50%) it says "unclassified" instead of guessing.
+
+**Llama 3.2 1B on ExecuTorch (laptop CPU):** 860 MB `.pte`, 1.42 GB RAM, 244 tokens/s prefill,
+31 tokens/s decode, defect advice in 2.3 s. Every answer is checked against the facts before
+it is shown; 17 of 18 benchmark answers passed, and the one that failed was replaced by correct
 deterministic text ([`results/x86_64/llama_VLSI.json`](results/x86_64/llama_VLSI.json)).
 
 ## Status (Phase 1)
 
 | Part | State |
 |---|---|
-| Good-only anomaly detection, severity, inspection log | working, benchmarked on laptop |
+| Good-only anomaly detection, severity, defect type, inspection log | working, benchmarked on laptop |
 | Operator dashboard (offline), teach-a-new-board | working |
 | Llama 3.2 1B via ExecuTorch (`TextLLMRunner`, 8da4w, XNNPACK), EN + HI, output checks | working, benchmarked on laptop |
 | Hailo: ONNX → INT8 → HEF (DFC 5.4, Hailo-10H), INT8 accuracy in emulator | working; HailoRT run pending hardware |
@@ -73,12 +77,14 @@ as the PS5 rules require.
 |---|---|
 | `qc_assist/anomaly.py` | PatchCore-style detector trained on good parts only |
 | `qc_assist/severity.py` | anomaly map → severity, defect area, location |
+| `qc_assist/defect_types.py` | defect type (missing, melt, bent, ...) from the detector's own features |
 | `qc_assist/advisor.py` | Llama advisory via ExecuTorch: plant policy, facts, few-shot prompts, output checks |
 | `qc_assist/inspection_log.py` | SQLite log of every inspection |
 | `qc_assist/inspector.py` | inspection engine: vision thread, Llama worker, "teach a new board" |
 | `qc_assist/dashboard.py` | offline operator web dashboard |
 | `scripts/prepare_visa.py` | extract VisA PCB categories into MVTec layout |
 | `scripts/train.py` | build a model from good images |
+| `scripts/train_types.py` | learn defect types from labelled defect images, cross-validated → JSON |
 | `scripts/run_inspection.py` | headless inspection loop on a camera or an image folder |
 | `scripts/dashboard.py` | start the operator dashboard |
 | `scripts/evaluate.py` | accuracy + latency benchmark → JSON (`--backend torch\|onnx\|hailo\|hailo-emu`) |
@@ -115,10 +121,13 @@ curl -o data/raw/visa_1cls.csv https://raw.githubusercontent.com/amazon-science/
 .venv/bin/python -I scripts/prepare_visa.py --tar data/raw/VisA_20220922.tar --csv data/raw/visa_1cls.csv --out data/visa
 ```
 
+This also writes `data/visa/<board>/defect_labels.csv` (the defect type of every defective test image).
+
 Train, benchmark, inspect:
 
 ```bash
 .venv/bin/python scripts/train.py --data data/visa/pcb1 --out models/pcb1.pt
+.venv/bin/python scripts/train_types.py --model models/pcb1.pt --data data/visa/pcb1   # defect types
 .venv/bin/python scripts/evaluate.py --model models/pcb1.pt --data data/visa/pcb1
 .venv/bin/python scripts/run_inspection.py --model models/pcb1.pt --source data/visa/pcb1/test
 ```
@@ -130,7 +139,7 @@ Operator dashboard (open http://localhost:8000):
 .venv/bin/python scripts/dashboard.py --source data/visa/pcb1/test --model models/pcb1.pt --max-fps 2 --loop
 ```
 
-It shows the live heatmap, the verdict and its latency, Llama advice, shift statistics, a
+It shows the live heatmap, the verdict with defect type and latency, Llama advice, shift statistics, a
 shift report, questions about the inspection log, an English/Hindi toggle, and **Teach a
 new board**, which captures 20 good boards from the camera, trains, and swaps in the new
 model without a restart.

@@ -20,6 +20,9 @@ from .io import frames, list_images, load_rgb, overlay
 from .severity import assess
 
 
+FRAME_FIELDS = ("severity", "defect_type", "score", "vision_ms", "fps", "status", "image")
+
+
 class Inspector:
     def __init__(self, cfg: dict, source: str, model_path: str | None = None,
                  max_fps: float | None = None, loop: bool = False, backend: str = "torch"):
@@ -36,6 +39,8 @@ class Inspector:
         self._pending = None          # (row_id, Future) — one advisory in flight at a time
         self._teach = None            # {"n": int, "frames": [..]} while capturing
         self.latest_jpeg: bytes | None = None
+        # (frame id, jpeg, verdict fields of that frame): the dashboard shows image and text together
+        self.latest_frame: tuple[int, bytes, dict] | None = None
         self.advisories: deque = deque(maxlen=20)
         self.state = {"status": "starting", "severity": None, "score": None,
                       "vision_ms": None, "fps": None, "image": None, "teach": None}
@@ -84,8 +89,10 @@ class Inspector:
             self._pending = (row, fut, verdict)
         self._harvest()
 
-        label = f"{verdict.severity.upper()}  score {verdict.score:.2f}  {vision_ms:.0f} ms"
+        kind = f" {verdict.defect_type}" if verdict.defect_type else ""
+        label = f"{verdict.severity.upper()}{kind}  score {verdict.score:.2f}  {vision_ms:.0f} ms"
         self._publish(frame, pred.anomaly_map, label, status="inspecting", severity=verdict.severity,
+                      defect_type=verdict.defect_type,
                       score=round(verdict.score, 3), vision_ms=round(vision_ms, 1), image=Path(name).name)
 
     def _harvest(self) -> None:
@@ -99,6 +106,7 @@ class Inspector:
             self.log.set_advisory(row, adv.text, adv.source)
             self.advisories.appendleft({"id": row, "time": time.strftime("%H:%M:%S"),
                                         "severity": verdict.severity, "region": verdict.region,
+                                        "defect_type": verdict.defect_type,
                                         "text": adv.text, "source": adv.source,
                                         "note": getattr(adv, "note", None)})
 
@@ -113,6 +121,20 @@ class Inspector:
             self.state["_t"] = now
             if ok:
                 self.latest_jpeg = jpg.tobytes()
+                fid = self.latest_frame[0] + 1 if self.latest_frame else 1
+                fields = {k: self.state.get(k) for k in FRAME_FIELDS}
+                self.latest_frame = (fid, self.latest_jpeg, {"id": fid, **fields})
+
+    def wait_frame(self, after: int, timeout: float = 2.0) -> tuple[int, bytes, dict] | None:
+        """The newest frame with id > after, waiting up to timeout seconds for one."""
+        end = time.perf_counter() + timeout
+        while True:
+            f = self.latest_frame
+            if f and f[0] > after:
+                return f
+            if time.perf_counter() > end:
+                return None
+            time.sleep(0.01)
 
     # ---------- teach a new board ----------
 

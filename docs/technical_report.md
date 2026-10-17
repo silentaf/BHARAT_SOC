@@ -68,6 +68,14 @@ DFC 3.x), Camera Module 3.
   normalised so 1.0 is the decision threshold.
 - Severity: from score and anomalous area (minor / major / critical); location reported
   as a 3x3 board region.
+- Defect type: for each defective board, the mean *residual* (patch feature minus its
+  nearest normal patch) over the 8 most anomalous patches describes what changed; a
+  logistic regression on it names the type (VisA PCB: melt, missing, bent, scratch; pcb4:
+  missing, extra, dirt, damage). It reuses the detector's features, so it needs no extra
+  network, works with every backend (CPU, ONNX, Hailo) and adds well under 1 ms. Below 50%
+  confidence the board is reported as "unclassified" rather than guessed. The type model
+  is stored in the product's model file; a factory trains it from labelled defect photos
+  (`scripts/train_types.py`).
 
 ### 4.2 Llama on ExecuTorch
 - Model: Llama 3.2 1B Instruct, exported with ExecuTorch 1.5.1: 4-bit grouped weights with
@@ -80,11 +88,18 @@ DFC 3.x), Camera Module 3.
   match the shift (good or poor). Facts are given in English, with Hindi location names
   for Hindi replies (Devanagari costs ~3x the tokens and the model reads English facts
   more reliably).
-- Output checks: a generation is rejected if it contains a number or a board location
-  that is not in the facts, contradicts the trend, the critical count or the shift rating,
-  claims no defect was found, repeats itself, or is cut off. Rejected output is replaced by
+- Output checks: a generation is rejected if it contains a number (exactly as written) or a
+  board location or defect type that is not in the facts, pairs a location or type with
+  the wrong count, contradicts the trend, the critical count or the shift rating, claims
+  no defect was found, repeats itself, or is cut off. Rejected output is replaced by
   deterministic text labelled `template`, and the dashboard shows the reason. Questions
-  about people (the log has none) are answered by rule.
+  about people (the log has none) are answered by rule, and Hindi questions are answered
+  with the exact Hindi figures from the log (see §7).
+- Runner robustness: ExecuTorch 1.5.1's Python runner passes each token to Python as UTF-8
+  text; when Llama 3's byte-level tokenizer splits a Devanagari character across two tokens
+  the binding raises and generation stops. This is caught and treated as a failed
+  generation (deterministic text shown). Giving defect types by their English names in
+  Hindi prompts avoided the split in the benchmark.
 
 ### 4.3 Product features
 - Operator dashboard served locally (no internet, no external assets).
@@ -104,7 +119,8 @@ DFC 3.x), Camera Module 3.
 | ONNX graph with one output per backbone layer (upsample + concat moved to CPU) | Hailo quantisation failed with one concatenated output (layers need separate scales); compiles with two |
 | Hailo NPU INT8 (DFC emulator, 4 boards) | mean image AUROC 0.955 → 0.956, pixel AUROC 0.989 → 0.989: no measurable loss |
 | Llama 8da4w + 4-bit embeddings | 860 MB `.pte`, 1.47 GB peak RAM, 31 tokens/s decode on the laptop CPU; Pi 5 TBD |
-| Facts as text + few-shot + output checks instead of a JSON prompt | Llama outputs passing all checks: 17 of 21 (laptop benchmark); before, 1B output was frequently wrong (see §4.2) |
+| Facts as text + few-shot + output checks instead of a JSON prompt | Llama outputs passing all checks: 17 of 18 (laptop benchmark); before, 1B output was frequently wrong (see §4.2) |
+| Defect-type descriptor: residual vs nearest normal patch instead of the raw feature (pcb1, 1-NN, leave-one-out) | accuracy 0.79 → 0.89 |
 
 ## 6. Results
 
@@ -122,7 +138,7 @@ Operating point: 99th-percentile threshold (favours few false alarms). pcb3's lo
 this threshold despite AUROC 0.924 means a lower threshold would catch more defects at the
 cost of more false alarms; the threshold percentile is a per-product setting.
 
-#### 6.2 Performance
+### 6.2 Performance
 
 Latency is per frame for the whole vision step (resize from the full camera image,
 features, kNN, anomaly map), from `scripts/evaluate.py` on the 200 test boards.
@@ -131,21 +147,21 @@ features, kNN, anomaly map), from `scripts/evaluate.py` on the 200 test boards.
 |---|---|---|
 | Laptop CPU (x86-64, 16 threads), PyTorch | 43.2 / 47.1 (mean of 4 products) | 23.4 |
 | Laptop CPU (x86-64, 16 threads), ONNX Runtime | 40.2 / 46.5 (mean of 4 products) | 24.9 |
-
-The laptop is shared and was busy (load average 14) during the final run; pcb1 with ONNX
-Runtime measured 33.3 and 39.8 ms in two back-to-back runs. Earlier quiet-machine runs gave
-37.3 / 32.8 ms (PyTorch / ONNX Runtime). The Pi numbers will be taken on an idle board.
 | Pi 5 CPU, PyTorch | TBD | TBD |
 | Pi 5 CPU, ONNX Runtime | TBD | TBD |
 | Pi 5 + AI HAT+, HailoRT | TBD | TBD |
 
+The laptop is shared and was busy (load average 14) during the final run; pcb1 with ONNX
+Runtime measured 33.3 and 39.8 ms in two back-to-back runs. Earlier quiet-machine runs gave
+37.3 / 32.8 ms (PyTorch / ONNX Runtime). The Pi numbers will be taken on an idle board.
+
 | Llama 3.2 1B (ExecuTorch, 8da4w, XNNPACK) | Laptop (x86-64) | Pi 5 |
 |---|---|---|
-| Prefill tokens/s (median) | 240 | TBD |
-| Decode tokens/s (median) | 31.4 | TBD |
-| Defect advice, request to text (median, English) | 2.1 s | TBD |
+| Prefill tokens/s (median) | 244 | TBD |
+| Decode tokens/s (median) | 31.0 | TBD |
+| Defect advice, request to text (median) | 2.3 s | TBD |
 | Load + first call | 6.5 s | TBD |
-| Peak RAM (whole process) | 1,469 MB | TBD |
+| Peak RAM (whole process) | 1,422 MB | TBD |
 
 Source: `scripts/bench_llama.py --repeats 3` → `results/x86_64/llama_VLSI.json`, which also
 holds every generated text and whether it passed the checks:
@@ -153,16 +169,32 @@ holds every generated text and whether it passed the checks:
 | Task | Llama output accepted |
 |---|---|
 | Advice EN (major, critical) | 6/6 |
-| Advice HI | 2/3 |
-| Shift report EN / HI | 3/3, 3/3 |
+| Advice HI | 3/3 |
+| Shift report EN / HI | 3/3, 2/3 (one "3.0%" for a 2.9% rate, caught) |
 | Question EN | 3/3 |
-| Question HI | 0/3, all caught (wrong location); correct Hindi figures shown instead |
+| Question HI | not sent to Llama: Hindi figures from the log (Llama failed in earlier runs) |
+| Question about people | not sent to Llama: answered by rule |
 
 CPU contention: with vision and Llama both on the laptop CPU, vision time per frame rose
 from 33 ms to ~100 ms while Llama was generating (live dashboard). This is the case for
 running the CNN on the Hailo NPU.
 
-### 6.3 Hailo NPU (INT8)
+### 6.3 Defect types
+
+Cross-validated (5 x stratified 5-fold) on the 100 labelled defective test boards of each
+VisA PCB category; `scripts/train_types.py` → `results/x86_64/<board>_types_VLSI.json`.
+"Baseline" always answers the most common type.
+
+| Category | Types (examples) | Accuracy | Balanced accuracy | Baseline | Confident (≥ 50%): share / accuracy |
+|---|---|---|---|---|---|
+| pcb1 | melt 54, missing 17, scratch 15, bent 14 | 88% | 84% | 54% | 95% / 90% |
+| pcb2 | melt 55, missing 17, scratch 16, bent 12 | 76% | 68% | 55% | 85% / 82% |
+| pcb3 | melt 43, scratch 22, bent 19, missing 16 | 82% | 79% | 43% | 84% / 88% |
+| pcb4 | dirt 42, missing 26, extra 18, damage 8 | 69% | 58% | 45% | 82% / 75% |
+
+Boards with several defect types count as correct if the predicted type is any of them.
+
+### 6.4 Hailo NPU (INT8)
 
 Compiled with the Hailo Dataflow Compiler 5.4.0 for Hailo-10H (AI HAT+ 2): HEFs 3.9–4.4 MB,
 compile time 122 s per board on the laptop CPU. Accuracy of the INT8 model with the DFC emulator
@@ -184,10 +216,13 @@ Power (USB-C meter, Pi 5): idle TBD W, inspecting TBD W, inspecting + Llama TBD 
 
 - VisA images are captured under controlled lighting; real-line robustness needs our own
   captures (Phase 2).
-- Defect *type* is not classified yet; Llama is told location, size and severity only.
-- Llama 3.2 1B is weak in Hindi: free-form Hindi answers to operator questions failed the
-  checks in all 3 benchmark runs (the deterministic Hindi summary is shown instead).
-  Hindi advice and reports pass.
+- Defect types need labelled examples per product, and accuracy is lower for rare types
+  (pcb4: balanced accuracy 58%; three types with only 2 examples each were left out). The
+  dashboard demo on VisA test images uses a type model trained on those same images; the
+  accuracy figures in §6.3 are cross-validated.
+- Llama 3.2 1B is weak in Hindi question answering: in our benchmark runs its Hindi answers
+  named wrong locations or called every defect "melt", so Hindi questions get the exact
+  log figures in Hindi instead. Hindi advice and shift reports from Llama pass the checks.
 - The checks catch wrong numbers, locations and trend/severity contradictions, but not
   every wording error (e.g. "lowest" next to the largest count with correct numbers).
 - Severity cut-offs are heuristics and must be tuned per product with a quality engineer.
@@ -196,7 +231,7 @@ Power (USB-C meter, Pi 5): idle TBD W, inspecting TBD W, inspecting + Llama TBD 
 
 - HailoRT backend measured on the AI HAT+ (code and HEF ready; INT8 accuracy already checked
   in the emulator).
-- Defect-type classifier on detected regions.
+- Operator labelling of defect types from the dashboard, so the type model grows on the line.
 - Hindi voice output for operators.
 - Field test with real boards on a demo conveyor or turntable.
 

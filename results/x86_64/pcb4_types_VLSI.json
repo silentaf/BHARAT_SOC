@@ -1,0 +1,43 @@
+{
+  "model": "pcb4.pt",
+  "host": "VLSI",
+  "machine": "x86_64",
+  "n_defects": 94,
+  "types": {
+    "damage": 8,
+    "dirt": 42,
+    "extra": 18,
+    "missing": 26
+  },
+  "left_out_types": {
+    "burnt": 2,
+    "scratch": 2,
+    "wrong place": 2
+  },
+  "cv": "5x stratified 5-fold",
+  "accuracy": 0.6936170212765956,
+  "accuracy_std": 0.026403560948916726,
+  "balanced_accuracy": 0.5828754578754578,
+  "majority_baseline": 0.44680851063829785,
+  "confident_coverage": 0.8212765957446807,
+  "confident_accuracy": 0.7515099056194947,
+  "confusion_true_pred": {
+    "damage -> damage": 12,
+    "damage -> dirt": 22,
+    "damage -> extra": 3,
+    "damage -> missing": 3,
+    "dirt -> damage": 6,
+    "dirt -> dirt": 124,
+    "dirt -> extra": 46,
+    "dirt -> missing": 34,
+    "extra -> damage": 7,
+    "extra -> dirt": 46,
+    "extra -> extra": 31,
+    "extra -> missing": 6,
+    "missing -> damage": 4,
+    "missing -> dirt": 23,
+    "missing -> extra": 2,
+    "missing -> missing": 101
+  },
+  "saved_to": "pcb4.pt"
+}

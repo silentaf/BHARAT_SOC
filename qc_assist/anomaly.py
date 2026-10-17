@@ -26,6 +26,7 @@ from torchvision.models.feature_extraction import create_feature_extractor
 from torchvision.transforms import functional as TF
 
 import qc_assist  # noqa: F401  (sets TORCH_HOME)
+from .defect_types import TOP_PATCHES, DefectTypeClassifier
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
@@ -53,6 +54,9 @@ class Prediction:
     score: float          # image anomaly score normalised so 1.0 == decision threshold
     is_defect: bool
     anomaly_map: np.ndarray  # HxW float32, same normalisation, at image_size resolution
+    descriptor: np.ndarray | None = None  # what changed at the worst patches (defect_types.py)
+    defect_type: str | None = None        # set when the product has a defect-type model and is_defect
+    type_confidence: float | None = None
 
 
 class PatchEmbedder(torch.nn.Module):
@@ -166,6 +170,7 @@ class PatchCore:
         self.embedder = PatchEmbedder(self.cfg.backbone, self.cfg.layers, pretrained).eval().to(self.device)
         self.memory_bank: torch.Tensor | None = None
         self.threshold: float | None = None
+        self.defect_types: DefectTypeClassifier | None = None
 
     # ---------- features ----------
 
@@ -218,32 +223,48 @@ class PatchCore:
     # ---------- inference ----------
 
     @torch.no_grad()
-    def _raw_map(self, x: torch.Tensor) -> torch.Tensor:
+    def _raw_map(self, x: torch.Tensor, with_descriptor: bool = False):
         assert self.memory_bank is not None, "call fit() or load() first"
         emb, (h, w) = self.embed(x)
         b = emb.shape[0]
         dists = torch.cdist(emb.reshape(-1, emb.shape[-1]), self.memory_bank)
-        patch_scores = dists.min(dim=1).values.reshape(b, 1, h, w)
+        min_dist, nearest = dists.min(dim=1)
+        patch_scores = min_dist.reshape(b, 1, h, w)
         amap = F.interpolate(patch_scores, size=(self.cfg.image_size,) * 2, mode="bilinear", align_corners=False)
         k = int(4 * self.cfg.blur_sigma) * 2 + 1
-        return TF.gaussian_blur(amap, kernel_size=k, sigma=self.cfg.blur_sigma).squeeze(1)
+        amap = TF.gaussian_blur(amap, kernel_size=k, sigma=self.cfg.blur_sigma).squeeze(1)
+        if not with_descriptor:
+            return amap
+        # Defect descriptor: mean residual (patch feature - its nearest normal patch) over the
+        # most anomalous patches. Reuses this step's features, so it is almost free.
+        top = min_dist.reshape(b, h * w).topk(min(TOP_PATCHES, h * w), dim=1).indices
+        feats = torch.gather(emb, 1, top[..., None].expand(-1, -1, emb.shape[-1]))
+        normal = self.memory_bank[torch.gather(nearest.reshape(b, h * w), 1, top)]
+        return amap, (feats - normal).mean(dim=1)
 
     def predict(self, image: np.ndarray) -> Prediction:
         return self.predict_batch([image])[0]
 
     def predict_batch(self, images: list[np.ndarray]) -> list[Prediction]:
-        maps = (self._raw_map(self.preprocess(images)) / self.threshold).cpu().numpy().astype(np.float32)
+        maps, desc = self._raw_map(self.preprocess(images), with_descriptor=True)
+        maps = (maps / self.threshold).cpu().numpy().astype(np.float32)
         out = []
-        for m in maps:
+        for m, d in zip(maps, desc.cpu().numpy()):
             score = float(m.max())
-            out.append(Prediction(score=score, is_defect=score > 1.0, anomaly_map=m))
+            pred = Prediction(score=score, is_defect=score > 1.0, anomaly_map=m, descriptor=d)
+            if pred.is_defect and self.defect_types is not None:
+                pred.defect_type, pred.type_confidence = self.defect_types.predict(d)
+            out.append(pred)
         return out
 
     # ---------- persistence ----------
 
     def save(self, path: str | Path) -> None:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
-        torch.save({"config": asdict(self.cfg), "memory_bank": self.memory_bank.cpu(), "threshold": self.threshold}, path)
+        state = {"config": asdict(self.cfg), "memory_bank": self.memory_bank.cpu(), "threshold": self.threshold}
+        if self.defect_types is not None:
+            state["defect_types"] = self.defect_types.to_dict()
+        torch.save(state, path)
 
     @classmethod
     def load(cls, path: str | Path, device: str = "cpu", backend: str = "torch") -> "PatchCore":
@@ -256,6 +277,8 @@ class PatchCore:
         model = cls(DetectorConfig(**cfg), device=device)
         model.memory_bank = state["memory_bank"].to(device)
         model.threshold = state["threshold"]
+        if state.get("defect_types"):
+            model.defect_types = DefectTypeClassifier.from_dict(state["defect_types"])
         if backend == "onnx":
             model.embedder = OnnxEmbedder(Path(path).with_suffix("").as_posix() + "_embedder.onnx",
                                           threads=torch.get_num_threads())
