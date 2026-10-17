@@ -115,9 +115,25 @@ def verdict_facts(product: str, verdict: Verdict, lang: str = "en", recent_defec
     return " ".join(facts)
 
 
+# Defect rate at or above which a shift counts as poor (plant policy; tune per product).
+POOR_DEFECT_RATE_PCT = 5.0
+
+
 def shift_rating(stats: dict) -> str:
-    """'poor' if there were critical defects or the defect rate is rising, else 'good'."""
-    return "poor" if stats["by_severity"]["critical"] or trend(stats)[0] == "rising" else "good"
+    """'poor' if there were critical defects, the defect rate is rising, or it is at or above
+    POOR_DEFECT_RATE_PCT; else 'good'."""
+    return "poor" if _poor_reasons(stats) else "good"
+
+
+def _poor_reasons(stats: dict) -> list[str]:
+    s, why = stats["by_severity"], []
+    if s["critical"]:
+        why.append(f"{s['critical']} critical defects")
+    if trend(stats)[0] == "rising":
+        why.append("rising defect rate")
+    if stats["defect_rate_pct"] >= POOR_DEFECT_RATE_PCT:
+        why.append(f"defect rate {stats['defect_rate_pct']}%")
+    return why
 
 
 def stats_facts(stats: dict, lang: str = "en") -> str:
@@ -146,12 +162,12 @@ def stats_facts(stats: dict, lang: str = "en") -> str:
             f"{h['hour']} {100 * h['defective'] / h['inspected']:.1f}%" for h in hourly) + ".")
     parts.append(f"Trend: {TREND_WORD['en'][t]}"
                  + (f" ({first:.1f}% first hour, {last:.1f}% last hour)." if first is not None else "."))
-    if shift_rating(stats) == "poor":
-        why = [f"{s['critical']} critical defects"] if s["critical"] else []
-        why += ["rising defect rate"] if t == "rising" else []
+    why = _poor_reasons(stats)
+    if why:
         parts.append(f"Shift rating: POOR ({', '.join(why)}).")
     else:
-        parts.append("Shift rating: GOOD (no critical defects, defect rate not rising).")
+        parts.append(f"Shift rating: GOOD (no critical defects, defect rate below {POOR_DEFECT_RATE_PCT:g}% "
+                     "and not rising).")
     if stats.get("recent_defects"):
         parts.append("Recent defects: " + ", ".join(
             f"#{d['id']} {d['severity']}" + (f" {d['defect_type']}" if d.get("defect_type") else "")
@@ -349,7 +365,8 @@ CONTRADICTS = {
                "not getting worse", "isn't rising", "स्थिर", "घट", "नहीं बढ़", "बढ़ नहीं"),
     "falling": ("rising", "increas", "worse", "बढ़"),
     "stable": ("rising", "increas", "decreas", "falling", "बढ़", "घट"),
-    "unknown": ("rising", "increas", "decreas", "falling", "worse", "improv", "बढ़", "घट"),  # < 2 hours of data
+    "unknown": ("rising", "increas", "decreas", "falling", "worse", "improv", "stable", "steady",  # < 2 hours
+                "बढ़", "घट", "स्थिर"),
     "critical": ("no critical", "कोई गंभीर दोष नहीं"),
     "bad_shift": ("good shift", "success", "satisfactory", "अच्छी"),
     "defect_present": ("no defect", "not found", "nothing", "नहीं देखा", "नहीं मिला", "कोई दोष नहीं"),
@@ -423,7 +440,7 @@ def check_output(text: str, facts: str, stats: dict | None = None, defect_presen
         rules = [t] if t in CONTRADICTS else []
         if stats["by_severity"]["critical"]:
             rules.append("critical")
-        if stats["by_severity"]["critical"] or t == "rising":
+        if shift_rating(stats) == "poor":
             rules.append("bad_shift")
         low = text.lower()
         for rule in rules:
