@@ -25,6 +25,7 @@ from qc_assist.severity import assess
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", required=True)
+    ap.add_argument("--backend", default="torch", choices=["torch", "onnx", "hailo"])
     ap.add_argument("--source", required=True, help="image folder or camera index")
     ap.add_argument("--config")
     ap.add_argument("--show", action="store_true", help="display annotated frames")
@@ -33,7 +34,7 @@ def main():
 
     cfg = load_config(args.config)
     product = cfg["product"]
-    model = PatchCore.load(args.model)
+    model = PatchCore.load(args.model, backend=args.backend)
     log = InspectionLog(PROJECT_ROOT / cfg["log_db"])
     advisor = LlamaAdvisor.from_config(cfg["llama"], PROJECT_ROOT)
     print(f"advisor: {'Llama via ExecuTorch' if advisor.available else 'FALLBACK (Llama not configured yet)'}")

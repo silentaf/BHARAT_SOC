@@ -22,6 +22,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--source", required=True, help="camera index or image folder")
     ap.add_argument("--model")
+    ap.add_argument("--backend", default="torch", choices=["torch", "onnx", "hailo"],
+                    help="where the CNN runs: PyTorch or ONNX Runtime on the CPU, or the Hailo NPU")
     ap.add_argument("--config")
     ap.add_argument("--max-fps", type=float, help="slow down folder replay so people can watch")
     ap.add_argument("--loop", action="store_true", help="replay the folder forever")
@@ -29,7 +31,7 @@ def main():
     ap.add_argument("--port", type=int, default=8000)
     args = ap.parse_args()
 
-    inspector = Inspector(load_config(args.config), args.source, args.model, args.max_fps, args.loop)
+    inspector = Inspector(load_config(args.config), args.source, args.model, args.max_fps, args.loop, args.backend)
     inspector.start()
     create_app(inspector).run(host=args.host, port=args.port, threaded=True)
 

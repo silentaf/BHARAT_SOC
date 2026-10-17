@@ -22,11 +22,11 @@ from .severity import assess
 
 class Inspector:
     def __init__(self, cfg: dict, source: str, model_path: str | None = None,
-                 max_fps: float | None = None, loop: bool = False):
+                 max_fps: float | None = None, loop: bool = False, backend: str = "torch"):
         self.cfg = cfg
         self.product = cfg["product"]
         self.source, self.max_fps, self.loop = source, max_fps, loop
-        self.model = PatchCore.load(model_path) if model_path else None
+        self.model = PatchCore.load(model_path, backend=backend) if model_path else None
         self.log = InspectionLog(PROJECT_ROOT / cfg["log_db"])
         self.advisor = LlamaAdvisor.from_config(cfg["llama"], PROJECT_ROOT)
         self.lang = "en"
@@ -99,7 +99,8 @@ class Inspector:
             self.log.set_advisory(row, adv.text, adv.source)
             self.advisories.appendleft({"id": row, "time": time.strftime("%H:%M:%S"),
                                         "severity": verdict.severity, "region": verdict.region,
-                                        "text": adv.text, "source": adv.source})
+                                        "text": adv.text, "source": adv.source,
+                                        "note": getattr(adv, "note", None)})
 
     def _publish(self, frame, amap, label, **state) -> None:
         vis = overlay(frame, amap if amap is not None else np.zeros(frame.shape[:2], np.float32), label)
@@ -146,6 +147,12 @@ class Inspector:
         t0 = time.perf_counter()
         det = dict(self.cfg["detector"], layers=tuple(self.cfg["detector"]["layers"]))
         model = PatchCore(DetectorConfig(**det))
+        old = self.model
+        if old is not None and (old.cfg.backbone, old.cfg.layers, old.cfg.image_size) == \
+                (model.cfg.backbone, model.cfg.layers, model.cfg.image_size):
+            # The NPU network is the same ImageNet backbone for every product (only the memory bank
+            # differs), so a new board needs no recompile: keep the current ONNX/Hailo embedder.
+            model.embedder = old.embedder
         model.fit(imgs)
         path = PROJECT_ROOT / "models" / f"{self.product}_taught.pt"
         model.save(path)

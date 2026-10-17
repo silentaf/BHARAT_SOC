@@ -1,0 +1,19 @@
+{
+  "model": "pcb3.pt",
+  "host": "VLSI",
+  "machine": "x86_64",
+  "backend": "hailo-emu",
+  "torch_threads": 16,
+  "n_images": 201,
+  "image_auroc": 0.9314851485148514,
+  "pixel_auroc": 0.9891145356005052,
+  "recall_at_threshold": 0.55,
+  "false_alarm_rate": 0.0297029702970297,
+  "latency_ms": {
+    "mean": 1925.8728337008506,
+    "p50": 1874.8477699991781,
+    "p95": 2611.3482740183827
+  },
+  "fps": 0.5192450833206632,
+  "note": "accuracy of the INT8 Hailo model; latency is the x86 emulator, not the NPU"
+}

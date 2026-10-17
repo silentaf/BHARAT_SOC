@@ -2,9 +2,10 @@
 #   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 #   pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
 # Raspberry Pi 5 (aarch64): pip install -r requirements.txt
-# Tested versions (2026-10-16): torch 2.14.1, torchvision 0.29.1, executorch 1.5.1, onnxruntime 1.31.0
-torch
-torchvision
+# Tested versions (2026-10-17): torch 2.14.1, torchvision 0.29.1, executorch 1.5.1, onnxruntime 1.31.0
+# ExecuTorch's kernels are built against torch 2.14: another torch (e.g. a CUDA build) breaks Llama loading.
+torch==2.14.1
+torchvision==0.29.1
 executorch==1.5.1
 numpy
 pillow

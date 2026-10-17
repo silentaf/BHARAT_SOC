@@ -5,7 +5,8 @@ and write a calibration set for the Hailo Dataflow Compiler.
 
 Outputs (models/):
   <name>_embedder.onnx   input: 1x3xSxS RGB float in 0..255 (normalisation is inside the graph)
-                         output: 1xCxHxW patch features
+                         outputs: one 1xCxHxW map per backbone layer (e.g. layer2 40x40, layer3 20x20);
+                         upsample + concat runs on the CPU (PatchEmbedder.merge)
   <name>_calib.npy       N x S x S x 3 float32 RGB 0..255 — Hailo quantisation calibration data
 
 Then on an x86 Linux machine with the Hailo DFC: see docs/hailo.md.
@@ -23,12 +24,12 @@ import numpy as np
 import onnxruntime as ort
 import torch
 
-from qc_assist.anomaly import IMAGENET_MEAN, IMAGENET_STD, PatchCore
+from qc_assist.anomaly import IMAGENET_MEAN, IMAGENET_STD, PatchCore, PatchEmbedder
 from qc_assist.io import list_images, load_rgb
 
 
 class NPUGraph(torch.nn.Module):
-    """Normalisation + embedder, so the NPU takes raw camera pixels."""
+    """Normalisation + the NPU part of the embedder, so the NPU takes raw camera pixels."""
 
     def __init__(self, embedder):
         super().__init__()
@@ -37,7 +38,7 @@ class NPUGraph(torch.nn.Module):
         self.register_buffer("std", torch.tensor(IMAGENET_STD).view(1, 3, 1, 1) * 255)
 
     def forward(self, x):
-        return self.embedder((x - self.mean) / self.std)
+        return tuple(self.embedder.maps((x - self.mean) / self.std))
 
 
 def main():
@@ -55,16 +56,21 @@ def main():
     onnx_path = Path(f"{stem}_embedder.onnx")
 
     dummy = torch.rand(1, 3, size, size) * 255
-    torch.onnx.export(graph, dummy, onnx_path, input_names=["image"], output_names=["features"],
+    torch.onnx.export(graph, dummy, onnx_path, input_names=["image"], output_names=list(pc.cfg.layers),
                       opset_version=args.opset, dynamo=False)
     print(f"exported {onnx_path} ({onnx_path.stat().st_size / 1e6:.1f} MB)")
 
-    # Verify: ONNX Runtime output must match PyTorch.
+    # Verify: ONNX Runtime output must match PyTorch, per map and after the CPU merge.
     sess = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
     with torch.no_grad():
-        ref = graph(dummy).numpy()
-    out = sess.run(None, {"image": dummy.numpy()})[0]
-    print(f"max abs diff vs PyTorch: {np.abs(out - ref).max():.2e}  output shape {out.shape}")
+        ref = [m.numpy() for m in graph(dummy)]
+        full = pc.embedder((dummy / 255 - torch.tensor(IMAGENET_MEAN).view(1, 3, 1, 1))
+                           / torch.tensor(IMAGENET_STD).view(1, 3, 1, 1)).numpy()
+    outs = sess.run(None, {"image": dummy.numpy()})
+    for name, o, r in zip(pc.cfg.layers, outs, ref):
+        print(f"{name}: shape {o.shape}  max abs diff vs PyTorch {np.abs(o - r).max():.2e}")
+    merged = PatchEmbedder.merge([torch.from_numpy(o) for o in outs]).numpy()
+    print(f"merged features {merged.shape}  max abs diff vs PyTorch embedder {np.abs(merged - full).max():.2e}")
 
     x = dummy.numpy()
     for _ in range(5):

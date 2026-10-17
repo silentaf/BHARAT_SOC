@@ -52,7 +52,7 @@ def create_app(inspector: Inspector) -> Flask:
         stats = inspector.log.summary(inspector.product, time.time() - 8 * 3600)
         t0 = time.perf_counter()
         res = inspector.advisor.submit("report", stats, lang=inspector.lang).result(timeout=LLM_TIMEOUT_S)
-        return jsonify(text=res.text, source=res.source, seconds=round(time.perf_counter() - t0, 1),
+        return jsonify(text=res.text, source=res.source, note=res.note, seconds=round(time.perf_counter() - t0, 1),
                        stats=inspector.advisor.last_stats if res.source == "llama-executorch" else None)
 
     @app.post("/api/ask")
@@ -67,7 +67,7 @@ def create_app(inspector: Inspector) -> Flask:
         ][:10]
         t0 = time.perf_counter()
         res = inspector.advisor.submit("answer", question, stats, lang=inspector.lang).result(timeout=LLM_TIMEOUT_S)
-        return jsonify(text=res.text, source=res.source, seconds=round(time.perf_counter() - t0, 1),
+        return jsonify(text=res.text, source=res.source, note=res.note, seconds=round(time.perf_counter() - t0, 1),
                        stats=inspector.advisor.last_stats if res.source == "llama-executorch" else None)
 
     @app.post("/api/teach")
@@ -109,7 +109,7 @@ main{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(320px,1fr);gap:16
 .adv{border-left:3px solid var(--line);padding:6px 10px;margin-bottom:8px;background:#11181e;border-radius:4px}
 .adv .meta{color:var(--muted);font-size:12px}.adv p{margin:4px 0 0;white-space:pre-wrap}
 .src{font-size:11px;padding:1px 6px;border-radius:4px;background:#26313a}
-.src.llama-executorch{background:#1f6feb33;color:var(--accent)}
+.src.llama-executorch{background:#1f6feb33;color:var(--accent)}.src.template{background:#d2992233;color:var(--minor)}
 .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center}
 .grid div{background:#11181e;border-radius:6px;padding:8px}.grid b{display:block;font-size:20px}
 button,input{font:inherit;border-radius:6px;border:1px solid var(--line);background:#11181e;color:var(--text);padding:7px 12px}
@@ -154,13 +154,13 @@ async function tick(){
   const sev=s.severity||'-';$('sev').textContent=sev.toUpperCase();$('sev').className='sev sev-'+sev;
   $('score').textContent=s.score??'-';$('ms').textContent=s.vision_ms??'-';$('fps').textContent=s.fps??'-';
   $('status').textContent=s.status||'';$('teachst').textContent=s.teach||'';
-  if(s.advisories.length)$('advs').innerHTML=s.advisories.map(a=>`<div class="adv"><div class="meta">#${a.id} · ${a.time} · <span class="sev-${a.severity}">${a.severity}</span> · ${esc(a.region)} <span class="src ${a.source}">${a.source}</span></div><p>${esc(a.text)}</p></div>`).join('');
+  if(s.advisories.length)$('advs').innerHTML=s.advisories.map(a=>`<div class="adv"><div class="meta">#${a.id} · ${a.time} · <span class="sev-${a.severity}">${a.severity}</span> · ${esc(a.region)} <span class="src ${a.source}" title="${esc(a.note||'')}">${a.source}</span></div><p>${esc(a.text)}</p></div>`).join('');
  }catch(e){}
 }
 async function stats(){try{const s=await (await fetch('/api/summary')).json();
  $('n').textContent=s.inspected;$('rate').textContent=s.defect_rate_pct+'%';$('crit').textContent=s.by_severity.critical;$('maj').textContent=s.by_severity.major}catch(e){}}
 async function llm(url,body){$('answer').textContent='Llama is thinking...';
- const r=await post(url,body);const st=r.stats?` · ${r.stats.decode_tok_s} tok/s decode, ${r.stats.prefill_tok_s} tok/s prefill`:'';$('answer').textContent=r.error||`${r.text}\\n\\n(${r.source}, ${r.seconds}s${st})`}
+ const r=await post(url,body);const st=r.stats?` · ${r.stats.decode_tok_s} tok/s decode, ${r.stats.prefill_tok_s} tok/s prefill`:'';const why=r.note?` · Llama output rejected: ${r.note}`:'';$('answer').textContent=r.error||`${r.text}\\n\\n(${r.source}, ${r.seconds}s${st}${why})`}
 $('ask').onclick=()=>{const q=$('q').value.trim();if(q)llm('/api/ask',{question:q})};
 $('q').onkeydown=e=>{if(e.key==='Enter')$('ask').click()};
 $('report').onclick=()=>llm('/api/report');

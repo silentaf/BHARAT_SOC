@@ -12,6 +12,8 @@ keep the nearest-neighbour search on the Arm CPU.
 
 from __future__ import annotations
 
+import threading
+
 from dataclasses import dataclass, asdict
 from pathlib import Path
 
@@ -56,7 +58,10 @@ class Prediction:
 class PatchEmbedder(torch.nn.Module):
     """Backbone + local pooling + multi-scale concat: image batch -> (B, C, H, W) patch features.
 
-    This is the part that runs on the Hailo NPU; scripts/export_onnx.py exports exactly this module.
+    Split where the NPU hands over: `maps` (backbone + 3x3 local averaging, one output per layer)
+    is what scripts/export_onnx.py exports and the Hailo NPU runs; `merge` (upsample + concat)
+    runs on the CPU. One output per layer also lets the Hailo compiler give each its own
+    quantisation scale; a single concatenated output failed to quantise.
     """
 
     def __init__(self, backbone: str, layers: tuple[str, ...], pretrained: bool = True):
@@ -64,21 +69,24 @@ class PatchEmbedder(torch.nn.Module):
         net = get_model(backbone, weights="DEFAULT" if pretrained else None)
         self.extractor = create_feature_extractor(net, {l: l for l in layers})
 
+    def maps(self, x: torch.Tensor) -> list[torch.Tensor]:
+        # 3x3 average = local neighbourhood context for every patch
+        return [F.avg_pool2d(f, kernel_size=3, stride=1, padding=1) for f in self.extractor(x).values()]
+
+    @staticmethod
+    def merge(maps: list[torch.Tensor]) -> torch.Tensor:
+        grid = maps[0].shape[-2:]
+        return torch.cat([m if m.shape[-2:] == grid else
+                          F.interpolate(m, size=grid, mode="bilinear", align_corners=False) for m in maps], dim=1)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        feats = list(self.extractor(x).values())
-        grid = feats[0].shape[-2:]
-        maps = []
-        for f in feats:
-            f = F.avg_pool2d(f, kernel_size=3, stride=1, padding=1)  # local neighbourhood context
-            if f.shape[-2:] != grid:
-                f = F.interpolate(f, size=grid, mode="bilinear", align_corners=False)
-            maps.append(f)
-        return torch.cat(maps, dim=1)
+        return self.merge(self.maps(x))
 
 
 class OnnxEmbedder:
     """Drop-in replacement for PatchEmbedder running the exported graph (scripts/export_onnx.py)
-    with ONNX Runtime. The graph expects raw 0..255 pixels, so normalisation is undone first.
+    with ONNX Runtime. The graph expects raw 0..255 pixels, so normalisation is undone first;
+    it returns one map per layer, merged on the CPU as in PatchEmbedder.
     A HailoRT embedder for the AI HAT+ will follow the same interface."""
 
     def __init__(self, onnx_path: str | Path, threads: int | None = None):
@@ -95,8 +103,60 @@ class OnnxEmbedder:
 
     def __call__(self, x: torch.Tensor) -> torch.Tensor:
         raw = ((x.cpu() * self.std + self.mean) * 255).numpy()
-        outs = [self.sess.run(None, {"image": raw[i:i + 1]})[0] for i in range(len(raw))]
-        return torch.from_numpy(np.concatenate(outs))
+        return torch.cat([PatchEmbedder.merge([torch.from_numpy(m) for m in self.sess.run(None, {"image": raw[i:i + 1]})])
+                          for i in range(len(raw))])
+
+
+class HailoEmbedder:
+    """The NPU part on a Hailo chip, same interface as OnnxEmbedder (see docs/hailo.md).
+
+    mode "hailort":  HailoRT on the device (Raspberry Pi 5 + AI HAT+), runs the compiled .hef.
+    mode "emulator": the Dataflow Compiler's INT8 emulator on an x86 PC, runs the quantised .har,
+                     so the accuracy cost of quantisation is measured before the hardware exists.
+    """
+
+    def __init__(self, path: str | Path, mode: str = "hailort"):
+        self._lock = threading.Lock()  # one set of device buffers; "teach a new board" calls from another thread
+        self.mean = torch.tensor(IMAGENET_MEAN).view(1, 3, 1, 1)
+        self.std = torch.tensor(IMAGENET_STD).view(1, 3, 1, 1)
+        if mode == "emulator":
+            from hailo_sdk_client import ClientRunner, InferenceContext
+            runner = ClientRunner(har=str(path))
+            self._ctx_manager = runner.infer_context(InferenceContext.SDK_QUANTIZED)
+            ctx = self._ctx_manager.__enter__()  # kept open for the embedder's lifetime
+            self._run = lambda x: runner.infer(ctx, x.astype(np.float32), batch_size=len(x))
+        elif mode == "hailort":
+            self._run = self._hailort(path)
+        else:
+            raise ValueError(f"unknown Hailo mode: {mode}")
+
+    def _hailort(self, hef_path):
+        from hailo_platform import FormatType, VDevice
+        self._vdevice = VDevice()
+        model = self._vdevice.create_infer_model(str(hef_path))
+        model.input().set_format_type(FormatType.UINT8)       # raw camera pixels, NHWC
+        for o in model.outputs:
+            o.set_format_type(FormatType.FLOAT32)              # de-quantised on the device
+        self._configured = model.configure()
+        bindings = self._configured.create_bindings()
+        outs = {o.name: np.empty(o.shape, np.float32) for o in model.outputs}
+        for name, buf in outs.items():
+            bindings.output(name).set_buffer(buf)
+
+        def run(x):
+            res = []
+            for img in x:
+                bindings.input().set_buffer(np.ascontiguousarray(img, dtype=np.uint8))
+                self._configured.run([bindings], 1000)
+                res.append([b.copy() for b in outs.values()])
+            return [np.stack(m) for m in zip(*res)]
+        return run
+
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        raw = ((x.cpu() * self.std + self.mean) * 255).round().clamp(0, 255).permute(0, 2, 3, 1).numpy()
+        with self._lock:
+            maps = sorted(self._run(raw), key=lambda m: -m.shape[1])  # NHWC per layer, finest grid first
+        return PatchEmbedder.merge([torch.from_numpy(np.ascontiguousarray(m)).permute(0, 3, 1, 2) for m in maps])
 
 
 class PatchCore:
@@ -187,7 +247,9 @@ class PatchCore:
 
     @classmethod
     def load(cls, path: str | Path, device: str = "cpu", backend: str = "torch") -> "PatchCore":
-        """backend: "torch" (default) or "onnx" (uses <model>_embedder.onnx next to the model file)."""
+        """backend: "torch" (default), "onnx" (<model>_embedder.onnx next to the model file),
+        "hailo" (HailoRT, hailo/<model>_embedder.hef) or "hailo-emu" (DFC INT8 emulator,
+        hailo/<model>_embedder_optimized.har); scripts/compile_hailo.sh builds the last two."""
         state = torch.load(path, map_location=device)
         cfg = state["config"]
         cfg["layers"] = tuple(cfg["layers"])
@@ -197,6 +259,10 @@ class PatchCore:
         if backend == "onnx":
             model.embedder = OnnxEmbedder(Path(path).with_suffix("").as_posix() + "_embedder.onnx",
                                           threads=torch.get_num_threads())
+        elif backend in ("hailo", "hailo-emu"):
+            stem = Path(path).parent / "hailo" / f"{Path(path).stem}_embedder"
+            model.embedder = (HailoEmbedder(f"{stem}.hef", "hailort") if backend == "hailo"
+                              else HailoEmbedder(f"{stem}_optimized.har", "emulator"))
         elif backend != "torch":
             raise ValueError(f"unknown backend: {backend}")
         return model

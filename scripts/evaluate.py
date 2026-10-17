@@ -31,7 +31,7 @@ def main():
     ap.add_argument("--data", required=True, help="category folder containing test/ (and optionally ground_truth/)")
     ap.add_argument("--threads", type=int, default=None, help="torch CPU threads (Pi 5 has 4 cores)")
     ap.add_argument("--warmup", type=int, default=3)
-    ap.add_argument("--backend", default="torch", choices=["torch", "onnx"])
+    ap.add_argument("--backend", default="torch", choices=["torch", "onnx", "hailo", "hailo-emu"])
     args = ap.parse_args()
 
     if args.threads:
@@ -88,6 +88,8 @@ def main():
                        "p95": float(np.percentile(lat, 95))},
         "fps": float(1000 / lat.mean()),
     }
+    if args.backend == "hailo-emu":
+        result["note"] = "accuracy of the INT8 Hailo model; latency is the x86 emulator, not the NPU"
     out = PROJECT_ROOT / "outputs" / "benchmarks" / f"{Path(args.model).stem}_{args.backend}_{platform.node()}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(result, indent=2))

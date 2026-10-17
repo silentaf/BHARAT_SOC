@@ -38,20 +38,20 @@ and can move to Phase 2 (PoC, due 10 Feb 2027) if time runs short.
 ## Deliverables checklist
 
 **Source code (GitHub, public)**
-- [ ] README: what it does, architecture diagram, setup on laptop and Pi, how to reproduce numbers
-- [ ] Training, inspection, evaluation scripts
-- [ ] Llama export + run instructions (ExecuTorch)
-- [ ] Hailo pipeline documented separately from the Llama pipeline (required by PS5 rules)
-- [ ] No datasets or model weights committed; download instructions instead
-- [ ] Licenses noted (VisA: CC BY 4.0; MVTec AD: CC BY-NC-SA 4.0; Llama 3.2 Community License)
+- [x] README: what it does, architecture diagram, setup on laptop and Pi, how to reproduce numbers
+- [x] Training, inspection, evaluation scripts
+- [x] Llama export + run instructions (ExecuTorch)
+- [x] Hailo pipeline documented separately from the Llama pipeline (required by PS5 rules)
+- [x] No datasets or model weights committed; download instructions instead
+- [x] Licenses noted (VisA: CC BY 4.0; MVTec AD: CC BY-NC-SA 4.0; Llama 3.2 Community License)
 
 **Technical report**
-- [ ] Problem + why on-device (latency, factory networks are often offline/air-gapped, data stays on site)
-- [ ] System architecture: vision pipeline (NPU/CPU) and Llama pipeline (CPU, ExecuTorch)
-- [ ] Method: good-only anomaly detection, severity, advisory
-- [ ] Optimisation: quantisation, threads, input size, NPU offload
-- [ ] Results: accuracy + performance tables, laptop vs Pi CPU vs Pi + Hailo
-- [ ] Limitations and Phase 2 plan
+- [x] Problem + why on-device (latency, factory networks are often offline/air-gapped, data stays on site)
+- [x] System architecture: vision pipeline (NPU/CPU) and Llama pipeline (CPU, ExecuTorch)
+- [x] Method: good-only anomaly detection, severity, advisory
+- [ ] Optimisation: quantisation, threads, input size, NPU offload (laptop + Hailo emulator done; Pi numbers pending)
+- [ ] Results: accuracy + performance tables, laptop vs Pi CPU vs Pi + Hailo (laptop done; Pi pending)
+- [x] Limitations and Phase 2 plan
 
 **Demo video (3–5 min)**
 - [ ] Hardware shown on camera (Pi, HAT, camera rig)

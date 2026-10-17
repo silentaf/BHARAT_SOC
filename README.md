@@ -9,17 +9,27 @@ running on-device through ExecuTorch** — fully offline, nothing leaves the fac
 
 ![QC-Assist operator dashboard: a VisA PCB with a damaged pin outlined in red](docs/images/dashboard.png)
 
-## Results so far (laptop CPU — Raspberry Pi 5 numbers next)
+## Results so far (laptop — Raspberry Pi 5 numbers next)
 
 VisA PCB categories, official one-class split (100 good + 100 defective test boards each),
 trained on good boards only. Full JSON: [`results/x86_64/`](results/x86_64/).
 
 | Board | Image AUROC | Pixel AUROC | Defects caught | False alarms | ms / frame (ONNX Runtime) |
 |---|---|---|---|---|---|
-| pcb1 | 0.972 | 0.996 | 80% | 5% | 32.9 |
-| pcb2 | 0.932 | 0.986 | 81% | 5% | 32.7 |
-| pcb3 | 0.924 | 0.989 | 53% | 3% | 32.4 |
-| pcb4 | 0.990 | 0.985 | 91% | 3% | 33.2 |
+| pcb1 | 0.972 | 0.996 | 80% | 5% | 39.6 |
+| pcb2 | 0.932 | 0.986 | 81% | 5% | 41.9 |
+| pcb3 | 0.924 | 0.989 | 53% | 3% | 39.7 |
+| pcb4 | 0.990 | 0.985 | 91% | 3% | 39.4 |
+
+Laptop timings are from a shared, busy laptop and vary 33–47 ms per frame between runs.
+
+**On the Hailo NPU (INT8, Dataflow Compiler emulator), all four boards:** image AUROC 0.955 → 0.956
+(mean). Quantisation costs no measurable accuracy. Compiled HEFs for Hailo-10H: 3.9–4.4 MB.
+
+**Llama 3.2 1B on ExecuTorch (laptop CPU):** 860 MB `.pte`, 1.47 GB RAM, 240 tokens/s prefill,
+31 tokens/s decode, defect advice in 2.1 s. Every answer is checked against the facts before
+it is shown; 17 of 21 benchmark answers passed, and the rest were replaced by correct
+deterministic text ([`results/x86_64/llama_VLSI.json`](results/x86_64/llama_VLSI.json)).
 
 ## Status (Phase 1)
 
@@ -27,8 +37,8 @@ trained on good boards only. Full JSON: [`results/x86_64/`](results/x86_64/).
 |---|---|
 | Good-only anomaly detection, severity, inspection log | working, benchmarked on laptop |
 | Operator dashboard (offline), teach-a-new-board | working |
-| Llama via ExecuTorch (`TextLLMRunner`, 8da4w, XNNPACK) | pipeline verified with a random-weight Llama 3.2-architecture model; real Llama 3.2 1B export pending model access |
-| ONNX export of the NPU part + Hailo calibration set | working; HEF compile pending Hailo DFC |
+| Llama 3.2 1B via ExecuTorch (`TextLLMRunner`, 8da4w, XNNPACK), EN + HI, output checks | working, benchmarked on laptop |
+| Hailo: ONNX → INT8 → HEF (DFC 5.4, Hailo-10H), INT8 accuracy in emulator | working; HailoRT run pending hardware |
 | Raspberry Pi 5 / AI HAT+ runs | pending hardware |
 
 ## Why it is different
@@ -63,7 +73,7 @@ as the PS5 rules require.
 |---|---|
 | `qc_assist/anomaly.py` | PatchCore-style detector trained on good parts only |
 | `qc_assist/severity.py` | anomaly map → severity, defect area, location |
-| `qc_assist/advisor.py` | Llama advisory through the ExecuTorch runner (async) |
+| `qc_assist/advisor.py` | Llama advisory via ExecuTorch: plant policy, facts, few-shot prompts, output checks |
 | `qc_assist/inspection_log.py` | SQLite log of every inspection |
 | `qc_assist/inspector.py` | inspection engine: vision thread, Llama worker, "teach a new board" |
 | `qc_assist/dashboard.py` | offline operator web dashboard |
@@ -71,9 +81,11 @@ as the PS5 rules require.
 | `scripts/train.py` | build a model from good images |
 | `scripts/run_inspection.py` | headless inspection loop on a camera or an image folder |
 | `scripts/dashboard.py` | start the operator dashboard |
-| `scripts/evaluate.py` | accuracy + latency benchmark → JSON (`--backend torch\|onnx`) |
+| `scripts/evaluate.py` | accuracy + latency benchmark → JSON (`--backend torch\|onnx\|hailo\|hailo-emu`) |
 | `scripts/export_onnx.py` | export the NPU part to ONNX + Hailo calibration set |
 | `scripts/export_llama.py` | export Llama 3.2 1B to ExecuTorch `.pte` (`configs/llama_export.yaml`) |
+| `scripts/bench_llama.py` | Llama speed, RAM and output-check pass rate on fixed prompts → JSON |
+| `scripts/compile_hailo.sh` | ONNX → INT8 → HEF with the Hailo DFC, then INT8 accuracy in the emulator |
 | `docs/executorch_llama.md` | exporting and running Llama 3.2 1B with ExecuTorch |
 | `docs/hailo.md` | compiling and running the vision network on the Hailo NPU |
 | `configs/default.yaml` | product, detector, severity and Llama settings |
@@ -91,8 +103,8 @@ python3 -m venv .venv            # or: virtualenv .venv
 .venv/bin/pytest -q              # smoke test on synthetic boards
 ```
 
-Llama 3.2 1B: download, export to `.pte` with `scripts/export_llama.py`, done —
-see `docs/executorch_llama.md`.
+Llama 3.2 1B: download, export to `.pte` with `scripts/export_llama.py`, benchmark with
+`scripts/bench_llama.py`; see `docs/executorch_llama.md`. Hailo: `docs/hailo.md`.
 
 Get the VisA dataset (CC BY 4.0, 1.9 GB) and convert its PCB categories to MVTec layout:
 
@@ -124,14 +136,14 @@ new board**, which captures 20 good boards from the camera, trains, and swaps in
 model without a restart.
 
 Until Llama is configured (see `docs/executorch_llama.md`) the advisor runs a
-clearly-labelled rule-based fallback.
+clearly-labelled rule-based fallback. `--backend onnx|hailo` picks where the CNN runs.
 
 ## Hardware
 
 | Part | Role |
 |---|---|
 | Raspberry Pi 5 (8 GB) | Arm Cortex-A76 CPU: Llama (ExecuTorch), nearest-neighbour search, UI |
-| Raspberry Pi AI HAT+ | Hailo NPU: CNN backbone (HailoRT) |
+| Raspberry Pi AI HAT+ 2 (Hailo-10H) | Hailo NPU: CNN backbone (HailoRT); AI HAT+ (Hailo-8/8L) works with DFC 3.x |
 | Camera Module 3 | image capture |
 
 ## Datasets and licenses

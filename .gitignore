@@ -11,3 +11,6 @@ third_party/
 *.onnx
 *.pth
 *.pt
+.venv-hailo/
+acceleras.log
+hailo_sdk.*.log

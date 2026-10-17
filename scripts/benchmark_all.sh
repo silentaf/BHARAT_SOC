@@ -24,7 +24,8 @@ lines = ["| Category | Backend | Host | Image AUROC | Pixel AUROC | Recall | Fal
 for r in rows:
     lines.append(f"| {r['model'][:-3]} | {r['backend']} | {r['machine']} | {r['image_auroc']:.3f} | {r['pixel_auroc']:.3f} | "
                  f"{r['recall_at_threshold']:.2f} | {r['false_alarm_rate']:.2f} | "
-                 f"{r['latency_ms']['mean']:.1f} / {r['latency_ms']['p95']:.1f} | {r['fps']:.1f} |")
+                 + ("emulator | - |" if r["backend"] == "hailo-emu" else  # x86 simulation time, not NPU speed
+                    f"{r['latency_ms']['mean']:.1f} / {r['latency_ms']['p95']:.1f} | {r['fps']:.1f} |"))
 open("outputs/benchmarks/summary.md", "w").write("\n".join(lines) + "\n")
 print("\n".join(lines))
 EOF
