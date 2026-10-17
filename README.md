@@ -43,7 +43,7 @@ deterministic text ([`results/x86_64/llama_VLSI.json`](results/x86_64/llama_VLSI
 | Operator dashboard (offline), teach a new board from 20 good boards (3 s on the laptop) | working |
 | Llama 3.2 1B via ExecuTorch (`TextLLMRunner`, 8da4w, XNNPACK), EN + HI, output checks | working, benchmarked on laptop |
 | Hailo: ONNX → INT8 → HEF (DFC 5.4, Hailo-10H), INT8 accuracy in emulator | working; HailoRT run in Phase 2 |
-| Raspberry Pi 5 / AI HAT+ 2 runs | Phase 2 (hardware provided to shortlisted teams) |
+| Raspberry Pi 5 / AI HAT+ 2 runs | pending our hardware |
 
 Phase 1 report: [`docs/technical_report.md`](docs/technical_report.md) (PDF: `python scripts/build_report.py`).
 Demo video script: [`docs/demo_script.md`](docs/demo_script.md).

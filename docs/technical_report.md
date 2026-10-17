@@ -11,8 +11,8 @@ Theme: Manufacturing & Industry 4.0
 
 > **Phase 1 scope.** The solution is implemented end to end and measured on an x86-64 laptop
 > CPU; the Arm deployment artefacts (ExecuTorch `.pte`, Hailo HEF) are built and verified
-> (§6.5). The Raspberry Pi 5 + AI HAT+ 2 measurements are Phase 2, on the hardware provided
-> to shortlisted teams, and are marked "Phase 2" below. Every number in this report comes
+> (§6.5). Measurements on our Raspberry Pi 5 + AI HAT+ 2 are not yet available and are
+> marked "Phase 2" below. Every number in this report comes
 > from a JSON file in `results/x86_64/` produced by the scripts in the repository.
 
 ## 1. Problem
