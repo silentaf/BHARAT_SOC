@@ -5,7 +5,8 @@ Arm CPU: Ubuntu (aarch64) inside Termux, the PyPI aarch64 wheels of PyTorch, Exe
 ONNX Runtime, and the phone camera through the IP Webcam app. Vision and Llama both run on
 the phone's Arm CPU (no Hailo NPU on a phone).
 
-**Phone:** 64-bit Android, **6 GB RAM minimum (8 GB better)**, ~6 GB free storage.
+**Phone:** 64-bit Android, **6 GB RAM minimum (8 GB better)**, ~6 GB free storage (about 3.5 GB stays used:
+Ubuntu + Python packages + models). Tested on a POCO M6 Plus 5G (Snapdragon 4 Gen 2, 6 GB), Ubuntu 26.04, Python 3.14.
 Keep it plugged in while benchmarking.
 
 ## 1. On the laptop: make the bundle (models + test data, ~1.1 GB)
