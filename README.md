@@ -18,7 +18,7 @@ running on-device through ExecuTorch** — fully offline, nothing leaves the fac
 | Demonstration video | [link to be added] · script: [`docs/demo_script.md`](docs/demo_script.md) |
 | Technical report | [`docs/technical_report.md`](docs/technical_report.md) (PDF: `python scripts/build_report.py`) |
 
-## Results so far (laptop — Raspberry Pi 5 numbers next)
+## Results (laptop, and the Arm phone below)
 
 VisA PCB categories, official one-class split (100 good + 100 defective test boards each),
 trained on good boards only. Full JSON: [`results/x86_64/`](results/x86_64/).
@@ -43,6 +43,10 @@ common type. When unsure (< 50%) it says "unclassified" instead of guessing.
 31 tokens/s decode, defect advice in 2.3 s. Every answer is checked against the facts before
 it is shown; 17 of 18 benchmark answers passed, and the one that failed was replaced by correct
 deterministic text ([`results/x86_64/llama_VLSI.json`](results/x86_64/llama_VLSI.json)).
+
+<!-- arm-results:begin -->
+**Arm device (Android phone, Arm CPU):** measurements pending — `bash scripts/arm_benchmarks.sh` on the phone ([`docs/phone.md`](docs/phone.md)), then `python scripts/arm_results.py`.
+<!-- arm-results:end -->
 
 ## Status (Phase 1)
 

@@ -43,12 +43,22 @@ bash scripts/setup_arm.sh /sdcard/Download/qc_assist_bundle.tar    # ~10 min: Py
 
 ## 4. Arm benchmarks for the report (~15–20 min)
 
+Keep the phone plugged in, close other apps and leave the screen on. Put your phone's model name
+in `DEVICE_NAME` (Settings → About phone):
+
 ```bash
-bash scripts/arm_benchmarks.sh
+DEVICE_NAME="Samsung Galaxy M34" bash scripts/arm_benchmarks.sh
 cp -r results/aarch64 /sdcard/Download/qc_results_aarch64
 ```
 
-Send `Download/qc_results_aarch64` back to the laptop (USB), into `results/aarch64/`.
+Send `Download/qc_results_aarch64` back to the laptop (USB), then on the laptop:
+
+```bash
+mkdir -p results/aarch64 && cp ~/Downloads/qc_results_aarch64/* results/aarch64/   # wherever you copied it
+python scripts/arm_results.py        # writes the phone numbers into the report and README
+python scripts/build_report.py       # report PDF
+git add results/aarch64 docs/technical_report.md README.md && git commit -m "Arm phone results" && git push
+```
 
 ## 5. The app on the phone
 

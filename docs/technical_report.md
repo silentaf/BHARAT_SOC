@@ -10,10 +10,10 @@ Theme: Manufacturing & Industry 4.0
 **Code:** https://github.com/silentaf/BHARAT_SOC
 
 > **Phase 1 scope.** The solution is implemented end to end and measured on an x86-64 laptop
-> CPU; the Arm deployment artefacts (ExecuTorch `.pte`, Hailo HEF) are built and verified
-> (§6.5). Measurements on our Raspberry Pi 5 + AI HAT+ 2 are not yet available and are
-> marked "Phase 2" below. Every number in this report comes
-> from a JSON file in `results/x86_64/` produced by the scripts in the repository.
+> CPU and on the Arm CPU of an Android phone (§6.2, PS5 allows "Arm-based Android devices with
+> camera"); the Hailo HEF is compiled and its INT8 accuracy verified in the emulator (§6.4).
+> Raspberry Pi 5 + AI HAT+ 2 measurements are marked "Phase 2" below. Every number in this
+> report comes from a JSON file in `results/` produced by the scripts in the repository.
 
 ## 1. Problem
 
@@ -194,6 +194,13 @@ CPU contention: with vision and Llama both on the laptop CPU, vision time per fr
 from 33 ms to ~100 ms while Llama was generating (live dashboard). This is the case for
 running the CNN on the Hailo NPU.
 
+**On Arm.** The same code and models on the phone's Arm CPU (Ubuntu in Termux, PyPI aarch64
+wheels; `scripts/arm_benchmarks.sh`, setup in `docs/phone.md`):
+
+<!-- arm-results:begin -->
+**Arm device (Android phone, Arm CPU):** measurements pending — `bash scripts/arm_benchmarks.sh` on the phone ([`docs/phone.md`](docs/phone.md)), then `python scripts/arm_results.py`.
+<!-- arm-results:end -->
+
 ### 6.3 Defect types
 
 Cross-validated (5 x stratified 5-fold) on the 100 labelled defective test boards of each
@@ -235,7 +242,7 @@ Power (USB-C meter on the Pi 5: idle, inspecting, inspecting + Llama): Phase 2.
 | Vision HEF for Hailo-10H (AI HAT+ 2) | Compiled with the Hailo DFC 5.4 for all four boards; INT8 accuracy verified in the DFC emulator (§6.4) |
 | HailoRT backend (`--backend hailo`) | Implemented with HailoRT's `VDevice` / `create_infer_model` API; runs on the device in Phase 2 |
 | Python dependencies | ExecuTorch 1.5.1, PyTorch 2.14.1 and ONNX Runtime publish aarch64 wheels: `pip install -r requirements.txt` on Raspberry Pi OS 64-bit |
-| Pi benchmarks | One command each: `THREADS=4 bash scripts/benchmark_all.sh`, `scripts/bench_llama.py` |
+| Arm benchmarks | One command: `bash scripts/arm_benchmarks.sh` (phone in Phase 1, Pi 5 in Phase 2) |
 
 ### 6.6 Learning from few good boards
 

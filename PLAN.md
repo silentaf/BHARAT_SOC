@@ -1,6 +1,14 @@
 # Phase 1 Plan — Bharat AI-SoC Challenge 2026–27, PS5
 
-**Goal:** submit by **28 Nov 2026** (2-day buffer before the 30 Nov deadline).
+**Goal:** submit by **21 Nov 2026** (2-day buffer before the **23 Nov** deadline in our shortlisting email).
+**Status (29 Oct):** shortlisted, PS5 confirmed. Laptop-side work done.
+**Arm device for Phase 1: Android phone** (PS5 allows it); Pi 5 + AI HAT+ 2 moves to Phase 2.
+Phone steps, all in [`docs/phone.md`](docs/phone.md):
+1. Copy `outputs/qc_assist_bundle.tar` (already built) to the phone; Termux + Ubuntu; `setup_arm.sh`.
+2. `DEVICE_NAME="<phone model>" bash scripts/arm_benchmarks.sh`; copy `results/aarch64/` back.
+3. Laptop: `python scripts/arm_results.py` → report + README tables; `python scripts/build_report.py`.
+4. Record the demo video (laptop dashboard + one scene of the app on the phone with its camera).
+5. Fill `[TEAM NAME]` etc. in the report, add the video link to the README, fresh-clone test, submit.
 **What to submit:** technical report + source code (GitHub) + demo video.
 
 ## What Phase 1 must prove (shortlisting bar)
@@ -24,9 +32,8 @@ and can move to Phase 2 (PoC, due 10 Feb 2027) if time runs short.
 | 1 | 20–26 Oct | Download VisA (pcb1–pcb4). Train/evaluate anomaly model on laptop; compare backbones. Install ExecuTorch, export Llama 3.2 1B (4-bit), run it on laptop. | AUROC table for pcb1–4; Llama `.pte` generates text |
 | 2 | 27 Oct–2 Nov | Pi setup: OS, camera, venv. Build ExecuTorch Llama runner on Pi. Run inspection on Pi CPU. **First full loop on Pi:** camera → defect → Llama advice → log. | End-to-end works on Pi; first FPS + tokens/s numbers |
 | 3 | 3–9 Nov | Hailo: compile backbone to HEF (Hailo compiler runs on x86 laptop), run on NPU, kNN stays on CPU. Llama features: shift report + questions over the inspection log. | CPU vs NPU benchmark; Llama answers log questions |
-| 4 | 10–16 Nov | Operator dashboard (local web page on Pi). "Teach a new board from ~20 good photos" flow. Demo rig: camera stand, lighting, real PCBs (good + deliberately damaged). | Live inspection of real boards works |
-| 5 | 17–23 Nov | Full benchmarks: accuracy, FPS, latency, RAM, power (USB-C meter), Llama tokens/s. Write technical report. | Report draft complete |
-| 6 | 24–28 Nov | Record demo video. Polish README, clean repo, final test from a fresh clone. **Submit.** | Submitted |
+| 4 | 10–14 Nov | Demo rig: camera stand, lighting, real PCBs (good + deliberately damaged). Full benchmarks on the Pi: FPS, latency, RAM, power (USB-C meter), Llama tokens/s. Attend the mentor doubt-clearing session. | Live inspection of real boards works; Pi numbers in report |
+| 5 | 15–21 Nov | Record demo video. Fill report placeholders, polish README, final test from a fresh clone. **Submit via the Challenge Submission Form.** | Submitted |
 
 ## If something slips
 

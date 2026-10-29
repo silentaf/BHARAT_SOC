@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # All benchmarks for the report on an Arm device (phone or Raspberry Pi 5), one command:
-#   bash scripts/arm_benchmarks.sh            # THREADS=4 by default (Pi 5 has 4 cores)
+#   DEVICE_NAME="Raspberry Pi 5" bash scripts/arm_benchmarks.sh   # THREADS=4 by default (Pi 5 has 4 cores)
+# DEVICE_NAME is how the report names the device (e.g. the phone model); Termux hides it from Linux.
 # Writes results/aarch64/: device info, vision accuracy/latency (PyTorch + ONNX Runtime) for
 # pcb1-4, and the Llama benchmark. Copy that folder back to the laptop (or git push it).
 set -euo pipefail
@@ -11,6 +12,7 @@ OUT="results/$(uname -m)"
 mkdir -p "$OUT"
 
 {
+  echo "device: ${DEVICE_NAME:-}"
   echo "host: $(hostname)   date: $(date -Iseconds)"
   grep -m1 -E "^(Model|Hardware)" /proc/cpuinfo || true
   lscpu | grep -E "^(Architecture|CPU\(s\)|Model name|Vendor ID|CPU max MHz)" || true
@@ -25,4 +27,4 @@ bash scripts/benchmark_all.sh
 echo "== Llama 3.2 1B on ExecuTorch =="
 .venv/bin/python scripts/bench_llama.py --repeats 3 | tail -25
 
-echo "done: results in $OUT/"
+echo "done: results in $OUT/ (on the laptop: python scripts/arm_results.py puts them in the report)"
