@@ -25,13 +25,15 @@ def device_line(res: Path) -> str:
     txt = next(iter(sorted(res.glob("device_*.txt"))), None)
     if txt is None:
         return "Arm device"
-    info = {}
+    info, cores = {}, []
     for line in txt.read_text().splitlines():
         k, _, v = line.partition(":")
         info.setdefault(k.strip(), v.strip())
+        if k.strip() == "Model name":
+            cores.append(v.strip())  # one line per core type on big.LITTLE chips
     parts = [info.get("device") or info.get("Model") or info.get("Hardware") or "Arm device"]
-    if info.get("Model name"):
-        parts.append(info["Model name"])
+    if cores:
+        parts.append(" + ".join(sorted(set(cores), reverse=True)))
     if info.get("CPU(s)"):
         parts.append(f"{info['CPU(s)']} cores")
     mem = info.get("MemTotal", "").split()

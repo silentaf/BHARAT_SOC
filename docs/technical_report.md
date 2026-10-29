@@ -240,7 +240,7 @@ Power (USB-C meter on the Pi 5: idle, inspecting, inspecting + Llama): Phase 2.
 | Llama 3.2 1B `.pte` (ExecuTorch, XNNPACK, 8da4w) | Exported and run through the same `TextLLMRunner` API that runs on the Pi; XNNPACK uses Arm KleidiAI kernels on Cortex-A76 |
 | Vision HEF for Hailo-10H (AI HAT+ 2) | Compiled with the Hailo DFC 5.4 for all four boards; INT8 accuracy verified in the DFC emulator (§6.4) |
 | HailoRT backend (`--backend hailo`) | Implemented with HailoRT's `VDevice` / `create_infer_model` API; runs on the device in Phase 2 |
-| Python dependencies | ExecuTorch 1.5.1, PyTorch 2.14.1 and ONNX Runtime publish aarch64 wheels: `pip install -r requirements.txt` on Raspberry Pi OS 64-bit |
+| Python dependencies | ExecuTorch 1.5.1, PyTorch 2.14.1 (CPU-only build) and ONNX Runtime publish aarch64 wheels; `scripts/setup_arm.sh` installs them on a Pi or phone, nothing compiles |
 | Arm benchmarks | One command: `bash scripts/arm_benchmarks.sh` (phone in Phase 1, Pi 5 in Phase 2) |
 
 ### 6.6 Learning from few good boards

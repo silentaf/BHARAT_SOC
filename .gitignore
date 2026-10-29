@@ -14,3 +14,4 @@ third_party/
 .venv-hailo/
 acceleras.log
 hailo_sdk.*.log
+.pi/

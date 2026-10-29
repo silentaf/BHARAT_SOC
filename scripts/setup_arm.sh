@@ -22,7 +22,11 @@ if python3 -c "import hailo_platform" 2>/dev/null; then
 fi
 python3 -m venv $VENV_OPTS .venv
 # PyPI has aarch64 wheels for everything (torch 2.14.1, executorch 1.5.1, onnxruntime): nothing compiles.
-.venv/bin/pip install --no-cache-dir -q -r requirements.txt
+# PyPI's aarch64 torch pulls ~3 GB of NVIDIA CUDA libraries (for Arm servers with GPUs); a Pi or a
+# phone has no CUDA GPU, so take the CPU-only build first.
+CPU_INDEX=https://download.pytorch.org/whl/cpu
+.venv/bin/pip install --no-cache-dir -q torch==2.14.1 torchvision==0.29.1 --index-url $CPU_INDEX
+.venv/bin/pip install --no-cache-dir -q -r requirements.txt --extra-index-url $CPU_INDEX
 
 BUNDLE=${1:-qc_assist_bundle.tar}
 if [ -f "$BUNDLE" ]; then

@@ -1,7 +1,8 @@
 # Laptop (x86-64): install CPU-only PyTorch first, so pip doesn't pull the multi-GB CUDA build:
 #   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 #   pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
-# Raspberry Pi 5 (aarch64): pip install -r requirements.txt
+# Arm (aarch64: Pi 5, phone): bash scripts/setup_arm.sh, which installs the CPU-only torch first
+#   (PyPI's aarch64 torch pulls ~3 GB of NVIDIA CUDA libraries otherwise)
 # Tested versions (2026-10-17): torch 2.14.1, torchvision 0.29.1, executorch 1.5.1, onnxruntime 1.31.0
 # ExecuTorch's kernels are built against torch 2.14: another torch (e.g. a CUDA build) breaks Llama loading.
 torch==2.14.1
