@@ -19,6 +19,7 @@ mkdir -p "$OUT"
   grep MemTotal /proc/meminfo
   .venv/bin/python -c "import platform, torch, executorch; print('python', platform.python_version(), '| torch', torch.__version__, '| executorch', executorch.__version__ if hasattr(executorch, '__version__') else '?')"
   echo "threads for vision: $THREADS"
+  command -v hailortcli >/dev/null && { hailortcli --version | head -1; hailortcli fw-control identify 2>&1 | grep -iE "firmware|architecture" || true; }
 } | tee "$OUT/device_$(hostname).txt"
 
 echo "== vision: 4 boards x (PyTorch, ONNX Runtime) =="

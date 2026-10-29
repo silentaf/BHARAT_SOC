@@ -2,12 +2,12 @@
 
 **Goal:** submit by **21 Nov 2026** (2-day buffer before the **23 Nov** deadline in our shortlisting email).
 **Status (29 Oct):** shortlisted, PS5 confirmed. Laptop-side work done.
-**Arm device for Phase 1: Android phone** (PS5 allows it); Pi 5 + AI HAT+ 2 moves to Phase 2.
-Phone steps, all in [`docs/phone.md`](docs/phone.md):
-1. Copy `outputs/qc_assist_bundle.tar` (already built) to the phone; Termux + Ubuntu; `setup_arm.sh`.
-2. `DEVICE_NAME="<phone model>" bash scripts/arm_benchmarks.sh`; copy `results/aarch64/` back.
-3. Laptop: `python scripts/arm_results.py` → report + README tables; `python scripts/build_report.py`.
-4. Record the demo video (laptop dashboard + one scene of the app on the phone with its camera).
+**Arm device for Phase 1: Raspberry Pi 5 (8 GB) + AI HAT+ 2, in hand**; a phone (IP Webcam) is the camera.
+Pi steps, all in [`docs/pi.md`](docs/pi.md) (~2 h, plus ~30 min benchmarks):
+1. Flash Raspberry Pi OS 64-bit, install `hailo-h10-all`, `scp` the bundle, `setup_arm.sh`.
+2. `DEVICE_NAME=... bash scripts/arm_benchmarks.sh` (CPU + Hailo NPU + Llama); `scp` `results/aarch64/` back.
+3. Laptop: `python scripts/arm_results.py` → report + README tables; replace the remaining "Phase 2" Pi cells.
+4. Record the demo video on the Pi (dashboard on the laptop browser, phone as camera).
 5. Fill `[TEAM NAME]` etc. in the report, add the video link to the README, fresh-clone test, submit.
 **What to submit:** technical report + source code (GitHub) + demo video.
 

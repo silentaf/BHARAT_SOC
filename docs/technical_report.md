@@ -10,9 +10,8 @@ Theme: Manufacturing & Industry 4.0
 **Code:** https://github.com/silentaf/BHARAT_SOC
 
 > **Phase 1 scope.** The solution is implemented end to end and measured on an x86-64 laptop
-> CPU and on the Arm CPU of an Android phone (§6.2, PS5 allows "Arm-based Android devices with
-> camera"); the Hailo HEF is compiled and its INT8 accuracy verified in the emulator (§6.4).
-> Raspberry Pi 5 + AI HAT+ 2 measurements are marked "Phase 2" below. Every number in this
+> CPU and on a Raspberry Pi 5 + AI HAT+ 2 (§6.2, "On Arm"); the Hailo HEF's INT8 accuracy is
+> also verified in the DFC emulator (§6.4). Items still marked "Phase 2" below are not yet measured. Every number in this
 > report comes from a JSON file in `results/` produced by the scripts in the repository.
 
 ## 1. Problem
@@ -194,11 +193,11 @@ CPU contention: with vision and Llama both on the laptop CPU, vision time per fr
 from 33 ms to ~100 ms while Llama was generating (live dashboard). This is the case for
 running the CNN on the Hailo NPU.
 
-**On Arm.** The same code and models on the phone's Arm CPU (Ubuntu in Termux, PyPI aarch64
-wheels; `scripts/arm_benchmarks.sh`, setup in `docs/phone.md`):
+**On Arm.** The same code and models on the Raspberry Pi 5 (Cortex-A76 CPU) and its AI HAT+ 2
+(Hailo-10H NPU through HailoRT); `scripts/arm_benchmarks.sh`, setup in `docs/pi.md`:
 
 <!-- arm-results:begin -->
-**Arm device (Android phone, Arm CPU):** measurements pending — `bash scripts/arm_benchmarks.sh` on the phone ([`docs/phone.md`](docs/phone.md)), then `python scripts/arm_results.py`.
+**Arm device (Raspberry Pi 5 + AI HAT+ 2):** measurements pending — `bash scripts/arm_benchmarks.sh` on the Pi ([`docs/pi.md`](docs/pi.md)), then `python scripts/arm_results.py`.
 <!-- arm-results:end -->
 
 ### 6.3 Defect types

@@ -16,6 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 TARGETS = [ROOT / "docs" / "technical_report.md", ROOT / "README.md"]
+BACKENDS = {"torch": "PyTorch (CPU)", "onnx": "ONNX Runtime (CPU)", "hailo": "Hailo-10H NPU (HailoRT)"}
 BEGIN, END = "<!-- arm-results:begin -->", "<!-- arm-results:end -->"
 
 
@@ -43,11 +44,11 @@ def device_line(res: Path) -> str:
 
 def block(res: Path) -> str:
     vision = [json.load(open(p)) for p in sorted(glob.glob(str(res / "pcb*_*.json")))
-              if json.load(open(p)).get("backend") in ("torch", "onnx")]
+              if json.load(open(p)).get("backend") in BACKENDS]
     llama = next((json.load(open(p)) for p in sorted(glob.glob(str(res / "llama_*.json")))), None)
     if not vision and not llama:
-        return ("**Arm device (Android phone, Arm CPU):** measurements pending — "
-                "`bash scripts/arm_benchmarks.sh` on the phone ([`docs/phone.md`](docs/phone.md)), "
+        return ("**Arm device (Raspberry Pi 5 + AI HAT+ 2):** measurements pending — "
+                "`bash scripts/arm_benchmarks.sh` on the Pi ([`docs/pi.md`](docs/pi.md)), "
                 "then `python scripts/arm_results.py`.")
 
     out = [f"**Measured on an Arm device:** {device_line(res)}. Same code and models as the laptop; "
@@ -56,13 +57,13 @@ def block(res: Path) -> str:
         out += ["", "| Board | Backend | Image AUROC | Recall | False alarms | ms / frame (mean / p95) | FPS |",
                 "|---|---|---|---|---|---|---|"]
         for r in vision:
-            out.append(f"| {r['model'][:-3]} | {'ONNX Runtime' if r['backend'] == 'onnx' else 'PyTorch'} | "
+            out.append(f"| {r['model'][:-3]} | {BACKENDS[r['backend']]} | "
                        f"{r['image_auroc']:.3f} | {r['recall_at_threshold']:.0%} | {r['false_alarm_rate']:.0%} | "
                        f"{r['latency_ms']['mean']:.1f} / {r['latency_ms']['p95']:.1f} | {r['fps']:.1f} |")
-        for b in ("onnx", "torch"):
+        for b in BACKENDS:
             rs = [r for r in vision if r["backend"] == b]
             if rs:
-                out.append(f"| **mean** | {'ONNX Runtime' if b == 'onnx' else 'PyTorch'} | "
+                out.append(f"| **mean** | {BACKENDS[b]} | "
                            f"{statistics.mean(r['image_auroc'] for r in rs):.3f} | | | "
                            f"{statistics.mean(r['latency_ms']['mean'] for r in rs):.1f} | "
                            f"{statistics.mean(r['fps'] for r in rs):.1f} |")

@@ -12,6 +12,7 @@ for c in pcb1 pcb2 pcb3 pcb4; do
   files+=("models/$c.pt" "models/${c}_embedder.onnx" "data/visa/$c/test" "data/visa/$c/ground_truth"
           "data/visa/$c/defect_labels.csv")
 done
+files+=(models/hailo/pcb*_embedder.hef)              # Hailo-10H NPU (AI HAT+ 2), ~16 MB
 files+=(.cache/torch/hub/checkpoints/resnet18-*.pth)   # ImageNet backbone weights: no download on the device
 # 20 evenly spaced good pcb4 boards for scripts/demo.py teach
 mapfile -t teach < <(ls data/visa/pcb4/train/good/* | awk 'NR % 45 == 1' | head -20)

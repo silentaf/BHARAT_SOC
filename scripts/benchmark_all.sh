@@ -11,7 +11,10 @@ THREADS_ARG=${THREADS:+--threads $THREADS}
 for cat in pcb1 pcb2 pcb3 pcb4; do
   [ -f "models/$cat.pt" ] || $PY scripts/train.py --data "data/visa/$cat" --out "models/$cat.pt" --max-train 200
   [ -f "models/${cat}_embedder.onnx" ] || $PY scripts/export_onnx.py --model "models/$cat.pt" --calib "data/visa/$cat/train/good" >/dev/null 2>&1
-  for backend in torch onnx; do
+  backends="torch onnx"
+  # Hailo NPU too when HailoRT and the compiled HEF are on this device (Pi 5 + AI HAT+ 2)
+  [ -f "models/hailo/${cat}_embedder.hef" ] && $PY -c "import hailo_platform" 2>/dev/null && backends="$backends hailo"
+  for backend in $backends; do
     $PY scripts/evaluate.py --model "models/$cat.pt" --data "data/visa/$cat" --backend $backend $THREADS_ARG >/dev/null
   done
 done

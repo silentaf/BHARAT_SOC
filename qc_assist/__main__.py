@@ -42,6 +42,8 @@ def main():
     backend = app["backend"]
     if model is not None and backend == "onnx" and not Path(str(model.with_suffix("")) + "_embedder.onnx").exists():
         backend = "torch"  # e.g. a taught model: no ONNX export yet
+    if model is not None and backend == "hailo" and not (model.parent / "hailo" / f"{model.stem}_embedder.hef").exists():
+        backend = "torch"  # no compiled HEF for this model
     if model is None:
         backend = "torch"
 

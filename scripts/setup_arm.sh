@@ -13,7 +13,14 @@ SUDO=""; [ "$(id -u)" -ne 0 ] && SUDO="sudo"
 $SUDO apt-get update -q
 $SUDO apt-get install -y -q python3 python3-venv python3-pip libgl1 libglib2.0-0 curl
 
-python3 -m venv .venv
+# AI HAT+ 2: HailoRT's Python module comes from apt (hailo-h10-all, docs/pi.md), so the venv
+# must see the system packages.
+VENV_OPTS=""
+if python3 -c "import hailo_platform" 2>/dev/null; then
+  VENV_OPTS="--system-site-packages"
+  echo "HailoRT found: $(hailortcli --version 2>/dev/null | head -1)"
+fi
+python3 -m venv $VENV_OPTS .venv
 # PyPI has aarch64 wheels for everything (torch 2.14.1, executorch 1.5.1, onnxruntime): nothing compiles.
 .venv/bin/pip install --no-cache-dir -q -r requirements.txt
 

@@ -18,7 +18,7 @@ running on-device through ExecuTorch** — fully offline, nothing leaves the fac
 | Demonstration video | [link to be added] · script: [`docs/demo_script.md`](docs/demo_script.md) |
 | Technical report | [`docs/technical_report.md`](docs/technical_report.md) (PDF: `python scripts/build_report.py`) |
 
-## Results (laptop, and the Arm phone below)
+## Results (laptop, and the Raspberry Pi 5 below)
 
 VisA PCB categories, official one-class split (100 good + 100 defective test boards each),
 trained on good boards only. Full JSON: [`results/x86_64/`](results/x86_64/).
@@ -45,7 +45,7 @@ it is shown; 17 of 18 benchmark answers passed, and the one that failed was repl
 deterministic text ([`results/x86_64/llama_VLSI.json`](results/x86_64/llama_VLSI.json)).
 
 <!-- arm-results:begin -->
-**Arm device (Android phone, Arm CPU):** measurements pending — `bash scripts/arm_benchmarks.sh` on the phone ([`docs/phone.md`](docs/phone.md)), then `python scripts/arm_results.py`.
+**Arm device (Raspberry Pi 5 + AI HAT+ 2):** measurements pending — `bash scripts/arm_benchmarks.sh` on the Pi ([`docs/pi.md`](docs/pi.md)), then `python scripts/arm_results.py`.
 <!-- arm-results:end -->
 
 ## Status (Phase 1)
@@ -57,7 +57,7 @@ deterministic text ([`results/x86_64/llama_VLSI.json`](results/x86_64/llama_VLSI
 | Llama 3.2 1B via ExecuTorch (`TextLLMRunner`, 8da4w, XNNPACK), EN + HI, output checks | working, benchmarked on laptop |
 | Hailo: ONNX → INT8 → HEF (DFC 5.4, Hailo-10H), INT8 accuracy in emulator | working; HailoRT run in Phase 2 |
 | Android phone (Arm CPU) runs | setup ready ([`docs/phone.md`](docs/phone.md)), measurements pending |
-| Raspberry Pi 5 / AI HAT+ 2 runs | pending our hardware |
+| Raspberry Pi 5 / AI HAT+ 2 runs | hardware in hand; setup ready ([`docs/pi.md`](docs/pi.md)), measurements pending |
 
 Phase 1 report: [`docs/technical_report.md`](docs/technical_report.md) (PDF: `python scripts/build_report.py`).
 Demo video script: [`docs/demo_script.md`](docs/demo_script.md).
@@ -119,6 +119,7 @@ as the PS5 rules require.
 | `scripts/demo.py` | demo scenes for the video (`inspect`, `teach`) |
 | `qc_assist/__main__.py` | the application entry point (`python -m qc_assist`) |
 | `scripts/make_bundle.sh`, `scripts/setup_arm.sh`, `scripts/arm_benchmarks.sh` | move models + test data to an Arm device, set it up, run every benchmark |
+| `docs/pi.md` | Raspberry Pi 5 + AI HAT+ 2 from a blank microSD card: Hailo driver, setup, benchmarks, live app |
 | `docs/phone.md` | running on an Android phone (Termux + Ubuntu, phone camera) |
 | `scripts/build_report.py` | technical report → PDF |
 
