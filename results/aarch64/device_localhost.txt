@@ -1,0 +1,14 @@
+device: Xiaomi POCO M6 Plus 5G (24066PC95I), Snapdragon 4 Gen 2
+host: localhost   date: 2026-10-29T21:56:42+00:00
+Architecture:                         aarch64
+CPU(s):                               8
+Vendor ID:                            ARM
+Model name:                           Cortex-A55
+CPU(s) scaling MHz:                   76%
+CPU max MHz:                          1958.4000
+Model name:                           Cortex-A78
+CPU(s) scaling MHz:                   36%
+CPU max MHz:                          2304.0000
+MemTotal:        5531208 kB
+python 3.14.4 | torch 2.14.1+cpu | executorch ?
+threads for vision: 4

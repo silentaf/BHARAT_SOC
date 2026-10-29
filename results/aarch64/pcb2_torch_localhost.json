@@ -1,0 +1,18 @@
+{
+  "model": "pcb2.pt",
+  "host": "localhost",
+  "machine": "aarch64",
+  "backend": "torch",
+  "torch_threads": 4,
+  "n_images": 200,
+  "image_auroc": 0.932,
+  "pixel_auroc": 0.986205401653007,
+  "recall_at_threshold": 0.81,
+  "false_alarm_rate": 0.05,
+  "latency_ms": {
+    "mean": 614.1967700795067,
+    "p50": 614.5541140067508,
+    "p95": 662.9293674966902
+  },
+  "fps": 1.628142720240212
+}

@@ -38,9 +38,9 @@ def device_line(res: Path) -> str:
         parts.append(f"{info['CPU(s)']} cores")
     mem = info.get("MemTotal", "").split()
     if mem and mem[0].isdigit():
-        parts.append(f"{int(mem[0]) / 1024 ** 2:.0f} GB RAM")
+        parts.append(f"{int(mem[0]) / 1024 ** 2:.1f} GB RAM visible to Linux")
     if info.get("threads for vision"):
-        parts.append(f"vision on {info['threads for vision']} threads")
+        parts.append(f"vision on {info["threads for vision"]} threads")
     return ", ".join(parts)
 
 

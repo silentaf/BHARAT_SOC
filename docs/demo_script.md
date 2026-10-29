@@ -27,7 +27,7 @@ cd ~/"Desktop/bharat soc"                 # the project folder
 | 5 | 2:30–2:55 | Click **English → हिंदी**; wait for a new advisory; click Shift report | "For operators who prefer Hindi, the same advice and report in Hindi." |
 | 6 | 2:55–3:45 | Terminal: Ctrl+C, then `.venv/bin/python scripts/demo.py teach`. Dashboard shows NO MODEL. Paste the printed folder into "Train from folder", click it | "A new product. No model yet. We give it 20 good boards of the new design… trained in about three seconds, and it is already inspecting the new board. No defect images, no retraining in the cloud." |
 | 7 | 3:45–4:30 | `results/x86_64/summary.md`; `docs/hailo.md` table; terminal `ls -la models/hailo/*.hef` | "Everything is measured. On the VisA PCB dataset, mean image AUROC 0.955; defect types 69 to 88 percent correct. We compiled the vision network for the Hailo-10H NPU with the Dataflow Compiler — in INT8 the accuracy is unchanged. Llama is exported with ExecuTorch, 4-bit, 860 megabytes." |
-| 8 | 4:30–4:50 | README "Status" table | "On the Raspberry Pi 5 with the AI HAT+ 2, vision runs on the Hailo NPU and Llama on the Arm CPU; a phone is the camera. Same code as on the laptop, with speed and power measured on the Pi." |
+| 8 | 4:30–4:50 | README "Status" table | "The same app runs on an Android phone's Arm CPU: vision at 3 frames per second with the same accuracy, Llama at 12 tokens per second through ExecuTorch. In Phase 2 the Raspberry Pi 5 with the AI HAT+ 2 moves the vision network onto the Hailo NPU." |
 | 9 | 4:50–5:00 | Dashboard | "QC-Assist: offline, on-device inspection that learns a new board from 20 samples. Thank you." |
 
 ## Honesty notes (if asked)
@@ -37,4 +37,4 @@ cd ~/"Desktop/bharat soc"                 # the project folder
   is in the report.
 - The demo's defect-type model was trained on these VisA defect images; its accuracy on
   unseen defects is the cross-validated figure (69–88%).
-- Phase 1 runs on an x86 laptop and on the Raspberry Pi 5 + AI HAT+ 2 (docs/pi.md).
+- Phase 1 runs on an x86 laptop and on an Android phone (Arm CPU, results/aarch64); Pi 5 + AI HAT+ 2 is Phase 2 (docs/pi.md).

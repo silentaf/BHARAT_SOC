@@ -10,8 +10,10 @@ Theme: Manufacturing & Industry 4.0
 **Code:** https://github.com/silentaf/BHARAT_SOC
 
 > **Phase 1 scope.** The solution is implemented end to end and measured on an x86-64 laptop
-> CPU and on a Raspberry Pi 5 + AI HAT+ 2 (§6.2, "On Arm"); the Hailo HEF's INT8 accuracy is
-> also verified in the DFC emulator (§6.4). Items still marked "Phase 2" below are not yet measured. Every number in this
+> CPU and **on the Arm CPU of an Android phone** (Snapdragon 4 Gen 2; PS5 allows "Arm-based
+> Android devices with camera"): vision, Llama via ExecuTorch and the app all run on the phone
+> (§6.2). The Hailo HEF's INT8 accuracy is verified in the DFC emulator (§6.4); the Raspberry Pi 5 +
+> AI HAT+ 2 runs are Phase 2 (setup ready: `docs/pi.md`) and marked "Phase 2" below. Every number in this
 > report comes from a JSON file in `results/` produced by the scripts in the repository.
 
 ## 1. Problem
@@ -22,7 +24,8 @@ visual inspection is slow and inconsistent, and cloud-based AI inspection is oft
 option: factory networks are frequently isolated, images of products are confidential,
 and a round trip to the cloud adds latency on a moving line.
 
-QC-Assist performs the whole job on a Raspberry Pi 5: it detects and localises defects in
+QC-Assist performs the whole job on an Arm device (an Android phone in Phase 1, a Raspberry Pi 5
+with a Hailo NPU next): it detects and localises defects in
 real time, rates their severity, logs every board, and uses Llama 3.2 1B running locally
 through ExecuTorch to tell the operator what to do — in English or Hindi.
 
@@ -62,7 +65,8 @@ camera -> resize -> patch-feature CNN (NPU/CPU)    verdict + log statistics
 
 Hardware: Raspberry Pi 5 (8 GB, 4x Cortex-A76), Raspberry Pi AI HAT+ 2 (Hailo-10H; the
 vision network is compiled for it with DFC 5.4, and the same flow targets Hailo-8/8L with
-DFC 3.x), Camera Module 3.
+DFC 3.x), Camera Module 3. Phase 1 Arm device: Xiaomi POCO M6 Plus 5G (Snapdragon 4 Gen 2:
+2x Cortex-A78 + 6x Cortex-A55, 6 GB), Ubuntu 26.04 in Termux, its camera via IP Webcam.
 
 ## 4. Implementation
 
@@ -112,7 +116,7 @@ DFC 3.x), Camera Module 3.
 - Operator dashboard served locally (no internet, no external assets).
 - Teach a new board: capture N good boards from the camera, retrain on-device, hot-swap
   the model. Measured on the laptop: 3.0 s for 20 boards, including setting the alarm
-  threshold by 5-fold scoring of the 20 boards (§6.6); Pi 5: Phase 2.
+  threshold by 5-fold scoring of the 20 boards (§6.6).
 
 ![Operator dashboard: a VisA PCB with bent pins outlined, rated MAJOR, type "bent", with the plant rule and Llama advice](images/dashboard.png)
 
@@ -131,7 +135,10 @@ latency, Llama advice from ExecuTorch, shift statistics, questions, teach a new 
 | Disable ONNX Runtime thread spin-waiting | 166 → 11 ms per frame (ORT threads were starving the PyTorch kNN step) |
 | ONNX graph with one output per backbone layer (upsample + concat moved to CPU) | Hailo quantisation failed with one concatenated output (layers need separate scales); compiles with two |
 | Hailo NPU INT8 (DFC emulator, 4 boards) | mean image AUROC 0.955 → 0.956, pixel AUROC 0.989 → 0.989: no measurable loss |
-| Llama 8da4w + 4-bit embeddings | 860 MB `.pte`, 1.42 GB peak RAM, 31 tokens/s decode on the laptop CPU; Pi 5: Phase 2 |
+| Llama 8da4w + 4-bit embeddings | 860 MB `.pte`, 1.42 GB peak RAM, 31 tokens/s decode on the laptop CPU; 1.31 GB, 12.4 tokens/s on the phone |
+| Anomaly-map blur with OpenCV (separable) instead of torchvision's 2D convolution | same map (max difference 5e-7); 94 → 1.7 ms per frame on the phone; phone frame 548 → 310 ms |
+| CPU-only PyTorch build on Arm | PyPI's aarch64 torch pulls ~3 GB of CUDA libraries; did not fit on the phone |
+| ONNX Runtime threads on the phone (2 / 4 / 6 / 8) | 547 / 519 / 536 / 576 ms per frame: 4 (mixed big.LITTLE cores beyond that only add waiting) |
 | "Teach" threshold from 5-fold scoring of all 20 boards instead of 2 held-out boards | false alarms with 20 boards: pcb1 12% → 5%, pcb3 19% → 4%, pcb4 30% → 5% (pcb2 0% → 0%); recall 74/79/100% → 49/58/89% |
 | Facts as text + few-shot + output checks instead of a JSON prompt | Llama outputs passing all checks: 17 of 18 (laptop benchmark); before, 1B output was frequently wrong (see §4.2) |
 | Defect-type descriptor: residual vs nearest normal patch instead of the raw feature (pcb1, 1-NN, leave-one-out) | accuracy 0.79 → 0.89 |
@@ -161,21 +168,22 @@ features, kNN, anomaly map), from `scripts/evaluate.py` on the 200 test boards.
 |---|---|---|
 | Laptop CPU (x86-64, 16 threads), PyTorch | 43.2 / 47.1 (mean of 4 products) | 23.4 |
 | Laptop CPU (x86-64, 16 threads), ONNX Runtime | 40.2 / 46.5 (mean of 4 products) | 24.9 |
-| Pi 5 CPU, PyTorch | Phase 2 | Phase 2 |
-| Pi 5 CPU, ONNX Runtime | Phase 2 | Phase 2 |
+| Phone (Snapdragon 4 Gen 2, 4 threads), PyTorch | 623.2 / 667.7 (mean of 4 products) | 1.6 |
+| Phone (Snapdragon 4 Gen 2, 4 threads), ONNX Runtime | 331.3 / 359.3 (mean of 4 products) | 3.0 |
+| Pi 5 CPU | Phase 2 | Phase 2 |
 | Pi 5 + AI HAT+ 2, HailoRT | Phase 2 | Phase 2 |
 
 The laptop is shared and was busy (load average 14) during the final run; pcb1 with ONNX
 Runtime measured 33.3 and 39.8 ms in two back-to-back runs. Earlier quiet-machine runs gave
 37.3 / 32.8 ms (PyTorch / ONNX Runtime). The Pi numbers will be taken on an idle board.
 
-| Llama 3.2 1B (ExecuTorch, 8da4w, XNNPACK) | Laptop (x86-64) | Pi 5 |
-|---|---|---|
-| Prefill tokens/s (median) | 244 | Phase 2 |
-| Decode tokens/s (median) | 31.0 | Phase 2 |
-| Defect advice, request to text (median) | 2.3 s | Phase 2 |
-| Load + first call | 6.5 s | Phase 2 |
-| Peak RAM (whole process) | 1,422 MB | Phase 2 |
+| Llama 3.2 1B (ExecuTorch, 8da4w, XNNPACK) | Laptop (x86-64) | Phone (Arm) | Pi 5 |
+|---|---|---|---|
+| Prefill tokens/s (median) | 244 | 49 | Phase 2 |
+| Decode tokens/s (median) | 31.0 | 12.4 | Phase 2 |
+| Defect advice, request to text (median) | 2.3 s | 7.2 s | Phase 2 |
+| Load + first call | 6.5 s | 41.8 s | Phase 2 |
+| Peak RAM (whole process) | 1,422 MB | 1,312 MB | Phase 2 |
 
 Source: `scripts/bench_llama.py --repeats 3` → `results/x86_64/llama_VLSI.json`, which also
 holds every generated text and whether it passed the checks:
@@ -193,11 +201,40 @@ CPU contention: with vision and Llama both on the laptop CPU, vision time per fr
 from 33 ms to ~100 ms while Llama was generating (live dashboard). This is the case for
 running the CNN on the Hailo NPU.
 
-**On Arm.** The same code and models on the Raspberry Pi 5 (Cortex-A76 CPU) and its AI HAT+ 2
-(Hailo-10H NPU through HailoRT); `scripts/arm_benchmarks.sh`, setup in `docs/pi.md`:
+**On Arm (Android phone).** The same code and models on the phone's Arm CPU, Ubuntu inside
+Termux (`docs/phone.md`), one command: `scripts/arm_benchmarks.sh`. Accuracy is identical to the
+laptop on all four boards. ONNX Runtime gives 3 frames/s (331 ms), enough for a board every
+second at a manual station, but not for a fast line: of the 310 ms in a profiled frame, the CNN
+takes 146 ms and the kNN 109 ms, which is the work the Hailo NPU takes over in Phase 2. Llama
+advice arrives 7 s after a defect while inspection continues, and all 18 Llama outputs passed
+the checks. The 42 s first load is file reading through Termux's `proot` layer (later calls: 3.5 s
+load in the runner log). In the live app, with inspection running alongside, Llama decode drops
+to ~6.8 tokens/s (both share the CPU), the same contention seen on the laptop.
 
 <!-- arm-results:begin -->
-**Arm device (Raspberry Pi 5 + AI HAT+ 2):** measurements pending — `bash scripts/arm_benchmarks.sh` on the Pi ([`docs/pi.md`](docs/pi.md)), then `python scripts/arm_results.py`.
+**Measured on an Arm device:** Xiaomi POCO M6 Plus 5G (24066PC95I), Snapdragon 4 Gen 2, Cortex-A78 + Cortex-A55, 8 cores, 5.3 GB RAM visible to Linux, vision on 4 threads. Same code and models as the laptop; raw JSON in [`results/aarch64/`](results/aarch64/).
+
+| Board | Backend | Image AUROC | Recall | False alarms | ms / frame (mean / p95) | FPS |
+|---|---|---|---|---|---|---|
+| pcb1 | ONNX Runtime (CPU) | 0.972 | 80% | 5% | 333.1 / 362.2 | 3.0 |
+| pcb1 | PyTorch (CPU) | 0.972 | 80% | 5% | 643.2 / 680.7 | 1.6 |
+| pcb2 | ONNX Runtime (CPU) | 0.932 | 81% | 5% | 330.7 / 360.4 | 3.0 |
+| pcb2 | PyTorch (CPU) | 0.932 | 81% | 5% | 614.2 / 662.9 | 1.6 |
+| pcb3 | ONNX Runtime (CPU) | 0.924 | 53% | 3% | 326.8 / 355.5 | 3.1 |
+| pcb3 | PyTorch (CPU) | 0.924 | 53% | 3% | 609.7 / 653.2 | 1.6 |
+| pcb4 | ONNX Runtime (CPU) | 0.990 | 91% | 3% | 334.6 / 358.9 | 3.0 |
+| pcb4 | PyTorch (CPU) | 0.990 | 91% | 3% | 625.5 / 673.9 | 1.6 |
+| **mean** | PyTorch (CPU) | 0.955 | | | 623.2 | 1.6 |
+| **mean** | ONNX Runtime (CPU) | 0.955 | | | 331.3 | 3.0 |
+
+| Llama 3.2 1B (ExecuTorch, 8da4w, XNNPACK) on the Arm CPU | Value |
+|---|---|
+| Prefill tokens/s (median) | 49 |
+| Decode tokens/s (median) | 12.4 |
+| Defect advice, request to text (median) | 7.2 s |
+| Load + first call | 41.8 s |
+| Peak RAM (whole process) | 1,312 MB |
+| Llama output accepted by the checks | 18/18 Llama calls |
 <!-- arm-results:end -->
 
 ### 6.3 Defect types
@@ -282,7 +319,8 @@ type from 20 good boards. It runs on the laptop with `scripts/demo.py`.
 
 ## 9. Phase 2 plan
 
-- Run every benchmark on the Raspberry Pi 5 (CPU) and Pi 5 + AI HAT+ 2 (HailoRT): vision
+- Run every benchmark on the Raspberry Pi 5 (CPU) and Pi 5 + AI HAT+ 2 (HailoRT; hardware in
+  hand, setup in `docs/pi.md`): vision
   latency, Llama tokens/s, RAM and power. Code, `.pte` and HEF are ready (§6.5).
 - Our own boards under a fixed camera with controlled lighting; teach them on the device.
 - Operator labelling of defect types from the dashboard, so the type model grows on the line.

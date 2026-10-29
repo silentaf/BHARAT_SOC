@@ -3,7 +3,7 @@
 **Bharat AI-SoC Challenge 2026–27 · PS5: Real-time industrial defect detection & quality-control assistant**
 Theme: Manufacturing & Industry 4.0
 
-QC-Assist inspects printed circuit boards in real time on a Raspberry Pi 5, highlights
+QC-Assist inspects printed circuit boards in real time on an Arm device (Android phone now, Raspberry Pi 5 + Hailo NPU next), highlights
 defects, rates their severity, and gives the operator advice from **Llama 3.2 1B
 running on-device through ExecuTorch** — fully offline, nothing leaves the factory floor.
 
@@ -18,7 +18,7 @@ running on-device through ExecuTorch** — fully offline, nothing leaves the fac
 | Demonstration video | [link to be added] · script: [`docs/demo_script.md`](docs/demo_script.md) |
 | Technical report | [`docs/technical_report.md`](docs/technical_report.md) (PDF: `python scripts/build_report.py`) |
 
-## Results (laptop, and the Raspberry Pi 5 below)
+## Results (laptop, and an Arm phone below)
 
 VisA PCB categories, official one-class split (100 good + 100 defective test boards each),
 trained on good boards only. Full JSON: [`results/x86_64/`](results/x86_64/).
@@ -45,7 +45,29 @@ it is shown; 17 of 18 benchmark answers passed, and the one that failed was repl
 deterministic text ([`results/x86_64/llama_VLSI.json`](results/x86_64/llama_VLSI.json)).
 
 <!-- arm-results:begin -->
-**Arm device (Raspberry Pi 5 + AI HAT+ 2):** measurements pending — `bash scripts/arm_benchmarks.sh` on the Pi ([`docs/pi.md`](docs/pi.md)), then `python scripts/arm_results.py`.
+**Measured on an Arm device:** Xiaomi POCO M6 Plus 5G (24066PC95I), Snapdragon 4 Gen 2, Cortex-A78 + Cortex-A55, 8 cores, 5.3 GB RAM visible to Linux, vision on 4 threads. Same code and models as the laptop; raw JSON in [`results/aarch64/`](results/aarch64/).
+
+| Board | Backend | Image AUROC | Recall | False alarms | ms / frame (mean / p95) | FPS |
+|---|---|---|---|---|---|---|
+| pcb1 | ONNX Runtime (CPU) | 0.972 | 80% | 5% | 333.1 / 362.2 | 3.0 |
+| pcb1 | PyTorch (CPU) | 0.972 | 80% | 5% | 643.2 / 680.7 | 1.6 |
+| pcb2 | ONNX Runtime (CPU) | 0.932 | 81% | 5% | 330.7 / 360.4 | 3.0 |
+| pcb2 | PyTorch (CPU) | 0.932 | 81% | 5% | 614.2 / 662.9 | 1.6 |
+| pcb3 | ONNX Runtime (CPU) | 0.924 | 53% | 3% | 326.8 / 355.5 | 3.1 |
+| pcb3 | PyTorch (CPU) | 0.924 | 53% | 3% | 609.7 / 653.2 | 1.6 |
+| pcb4 | ONNX Runtime (CPU) | 0.990 | 91% | 3% | 334.6 / 358.9 | 3.0 |
+| pcb4 | PyTorch (CPU) | 0.990 | 91% | 3% | 625.5 / 673.9 | 1.6 |
+| **mean** | PyTorch (CPU) | 0.955 | | | 623.2 | 1.6 |
+| **mean** | ONNX Runtime (CPU) | 0.955 | | | 331.3 | 3.0 |
+
+| Llama 3.2 1B (ExecuTorch, 8da4w, XNNPACK) on the Arm CPU | Value |
+|---|---|
+| Prefill tokens/s (median) | 49 |
+| Decode tokens/s (median) | 12.4 |
+| Defect advice, request to text (median) | 7.2 s |
+| Load + first call | 41.8 s |
+| Peak RAM (whole process) | 1,312 MB |
+| Llama output accepted by the checks | 18/18 Llama calls |
 <!-- arm-results:end -->
 
 ## Status (Phase 1)
@@ -56,8 +78,8 @@ deterministic text ([`results/x86_64/llama_VLSI.json`](results/x86_64/llama_VLSI
 | Operator dashboard (offline), teach a new board from 20 good boards (3 s on the laptop) | working |
 | Llama 3.2 1B via ExecuTorch (`TextLLMRunner`, 8da4w, XNNPACK), EN + HI, output checks | working, benchmarked on laptop |
 | Hailo: ONNX → INT8 → HEF (DFC 5.4, Hailo-10H), INT8 accuracy in emulator | working; HailoRT run in Phase 2 |
-| Android phone (Arm CPU) runs | setup ready ([`docs/phone.md`](docs/phone.md)), measurements pending |
-| Raspberry Pi 5 / AI HAT+ 2 runs | hardware in hand; setup ready ([`docs/pi.md`](docs/pi.md)), measurements pending |
+| Android phone (Arm CPU) runs | **measured**: same accuracy as the laptop, 3 FPS vision, Llama 12.4 tokens/s ([`results/aarch64/`](results/aarch64/)) |
+| Raspberry Pi 5 / AI HAT+ 2 runs | Phase 2: hardware in hand, setup ready ([`docs/pi.md`](docs/pi.md)) |
 
 Phase 1 report: [`docs/technical_report.md`](docs/technical_report.md) (PDF: `python scripts/build_report.py`).
 Demo video script: [`docs/demo_script.md`](docs/demo_script.md).
