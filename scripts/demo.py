@@ -4,7 +4,7 @@
     python scripts/demo.py teach     # pcb4 with no model: "Train from folder" -> inspecting in ~1 s
 
 Builds short image sequences under outputs/demo/ (links to VisA images) and runs
-scripts/dashboard.py on http://127.0.0.1:8000. The inspect sequence is curated: good boards
+scripts/dashboard.py on http://127.0.0.1:8765. The inspect sequence is curated: good boards
 the detector passes and defective boards it catches, one or two per defect type. Accuracy
 over the full test set is in the report, not in this sequence.
 """
