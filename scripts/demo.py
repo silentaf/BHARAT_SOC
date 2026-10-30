@@ -16,10 +16,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from qc_assist.anomaly import PatchCore  # noqa: E402
+from qc_assist.config import load_config  # noqa: E402
 from qc_assist.io import list_images, load_rgb  # noqa: E402
 
 DEMO = ROOT / "outputs" / "demo"
@@ -72,8 +75,15 @@ def main():
     ap.add_argument("--port", type=int, default=8000)
     args = ap.parse_args()
 
+    # Fresh shift log for every demo run (the operator log in outputs/inspections.sqlite is left alone):
+    # stats, questions and the shift report then describe only what is on screen.
+    DEMO.mkdir(parents=True, exist_ok=True)
+    cfg = load_config()
+    cfg["log_db"] = str((DEMO / "demo_inspections.sqlite").relative_to(ROOT))
+    (DEMO / "demo_inspections.sqlite").unlink(missing_ok=True)
+    (DEMO / "demo_config.yaml").write_text(yaml.safe_dump(cfg, allow_unicode=True))
     cmd = [sys.executable, str(ROOT / "scripts" / "dashboard.py"), "--max-fps", str(args.fps), "--loop",
-           "--port", str(args.port)]
+           "--port", str(args.port), "--config", str(DEMO / "demo_config.yaml")]
     if args.scene == "inspect":
         cmd += ["--source", str(inspect_sequence()), "--model", str(ROOT / "models" / "pcb1.pt")]
     else:
