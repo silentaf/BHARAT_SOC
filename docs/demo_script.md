@@ -7,7 +7,7 @@ Recorder: OBS Studio, or GNOME's built-in recorder (Ctrl+Shift+Alt+R starts and 
 
 ```bash
 cd ~/"Desktop/bharat soc"                 # the project folder
-.venv/bin/python scripts/demo.py inspect  # leave running; open http://127.0.0.1:8000
+.venv/bin/python scripts/demo.py inspect  # leave running; open http://127.0.0.1:8765
 ```
 
 - Wait ~30 s after starting: the first Llama call loads the model (~6.5 s on the laptop).
@@ -28,8 +28,8 @@ says so, and the voice-over can point at it.
 
 1. Phone plugged in, **mobile data and Wi-Fi off** (shows it is offline).
 2. Termux: `proot-distro login ubuntu`, then `cd BHARAT_SOC && .venv/bin/python scripts/demo.py inspect`.
-   Wait until it prints `Running on http://127.0.0.1:8000` (about 2 minutes on the phone).
-3. Swipe Termux away to the background (don't close it), open **Chrome** → `127.0.0.1:8000`.
+   Wait until it prints `Running on http://127.0.0.1:8765` (about 2 minutes on the phone).
+3. Swipe Termux away to the background (don't close it), open **Chrome** → `127.0.0.1:8765`.
 4. Start the phone's screen recorder (Xiaomi: Control centre → **Screen recorder**), record
    ~60 s: boards passing, a red defect outline, the Llama advice card filling in (~7–10 s).
 5. Copy the recording to the laptop (USB) and cut 20 s of it into scene 8.

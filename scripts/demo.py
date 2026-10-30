@@ -72,7 +72,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("scene", choices=["inspect", "teach"])
     ap.add_argument("--fps", type=float, default=0.5, help="boards per second (slow enough to talk over)")
-    ap.add_argument("--port", type=int, default=8000)
+    ap.add_argument("--port", type=int, default=8765)  # 8000 is often taken by other local apps
     args = ap.parse_args()
 
     # Fresh shift log for every demo run (the operator log in outputs/inspections.sqlite is left alone):
