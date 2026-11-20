@@ -72,6 +72,9 @@ def main():
     lat = np.array(latencies)
     pred_labels = np.array(scores) > 1.0
     y = np.array(labels)
+    tp = int((pred_labels & (y == 1)).sum())
+    fp = int((pred_labels & (y == 0)).sum())
+    fn = int((~pred_labels & (y == 1)).sum())
     result = {
         "model": Path(args.model).name,
         "host": platform.node(),
@@ -84,6 +87,12 @@ def main():
         if pix_true and np.concatenate(pix_true).any() else None,
         "recall_at_threshold": float(pred_labels[y == 1].mean()) if y.any() else None,
         "false_alarm_rate": float(pred_labels[y == 0].mean()) if (y == 0).any() else None,
+        "n_defective": int(y.sum()),
+        "n_good": int((y == 0).sum()),
+        "true_positives": int(tp),
+        "false_positives": int(fp),
+        "precision": float(tp / (tp + fp)) if tp + fp else None,
+        "f1": float(2 * tp / (2 * tp + fp + fn)) if tp else 0.0,
         "latency_ms": {"mean": float(lat.mean()), "p50": float(np.percentile(lat, 50)),
                        "p95": float(np.percentile(lat, 95))},
         "fps": float(1000 / lat.mean()),

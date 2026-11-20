@@ -17,6 +17,7 @@
     "wall_s": 2.71
   },
   "advice_wall_s_median": 2.25,
+  "advice_ttft_s_median": 0.97,
   "llama_output_accepted": "17/18 Llama calls",
   "accepted_by_task": {
     "advise_en": "3/3",

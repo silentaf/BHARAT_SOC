@@ -539,6 +539,7 @@ class LlamaAdvisor:
         def on_stats(s):
             stats.update(prompt_tokens=s.num_prompt_tokens, generated_tokens=s.num_generated_tokens,
                          prefill_ms=s.prompt_eval_end_ms - s.inference_start_ms,
+                         ttft_ms=s.first_token_ms - s.inference_start_ms,
                          decode_ms=s.inference_end_ms - s.first_token_ms,
                          total_ms=s.inference_end_ms - s.inference_start_ms)
 

@@ -47,24 +47,25 @@ deterministic text ([`results/x86_64/llama_VLSI.json`](results/x86_64/llama_VLSI
 <!-- arm-results:begin -->
 **Measured on an Arm device:** Xiaomi POCO M6 Plus 5G (24066PC95I), Snapdragon 4 Gen 2, Cortex-A78 + Cortex-A55, 8 cores, 5.3 GB RAM visible to Linux, vision on 4 threads. Same code and models as the laptop; raw JSON in [`results/aarch64/`](results/aarch64/).
 
-| Board | Backend | Image AUROC | Recall | False alarms | ms / frame (mean / p95) | FPS |
-|---|---|---|---|---|---|---|
-| pcb1 | ONNX Runtime (CPU) | 0.972 | 80% | 5% | 333.1 / 362.2 | 3.0 |
-| pcb1 | PyTorch (CPU) | 0.972 | 80% | 5% | 643.2 / 680.7 | 1.6 |
-| pcb2 | ONNX Runtime (CPU) | 0.932 | 81% | 5% | 330.7 / 360.4 | 3.0 |
-| pcb2 | PyTorch (CPU) | 0.932 | 81% | 5% | 614.2 / 662.9 | 1.6 |
-| pcb3 | ONNX Runtime (CPU) | 0.924 | 53% | 3% | 326.8 / 355.5 | 3.1 |
-| pcb3 | PyTorch (CPU) | 0.924 | 53% | 3% | 609.7 / 653.2 | 1.6 |
-| pcb4 | ONNX Runtime (CPU) | 0.990 | 91% | 3% | 334.6 / 358.9 | 3.0 |
-| pcb4 | PyTorch (CPU) | 0.990 | 91% | 3% | 625.5 / 673.9 | 1.6 |
-| **mean** | PyTorch (CPU) | 0.955 | | | 623.2 | 1.6 |
-| **mean** | ONNX Runtime (CPU) | 0.955 | | | 331.3 | 3.0 |
+| Board | Backend | Image AUROC | Precision | Recall | F1 | False alarms | ms / frame (mean / p95) | FPS |
+|---|---|---|---|---|---|---|---|---|
+| pcb1 | ONNX Runtime (CPU) | 0.972 | 94% | 80% | 0.86 | 5% | 333.1 / 362.2 | 3.0 |
+| pcb1 | PyTorch (CPU) | 0.972 | 94% | 80% | 0.86 | 5% | 643.2 / 680.7 | 1.6 |
+| pcb2 | ONNX Runtime (CPU) | 0.932 | 94% | 81% | 0.87 | 5% | 330.7 / 360.4 | 3.0 |
+| pcb2 | PyTorch (CPU) | 0.932 | 94% | 81% | 0.87 | 5% | 614.2 / 662.9 | 1.6 |
+| pcb3 | ONNX Runtime (CPU) | 0.924 | 95% | 53% | 0.68 | 3% | 326.8 / 355.5 | 3.1 |
+| pcb3 | PyTorch (CPU) | 0.924 | 95% | 53% | 0.68 | 3% | 609.7 / 653.2 | 1.6 |
+| pcb4 | ONNX Runtime (CPU) | 0.990 | 97% | 91% | 0.94 | 3% | 334.6 / 358.9 | 3.0 |
+| pcb4 | PyTorch (CPU) | 0.990 | 97% | 91% | 0.94 | 3% | 625.5 / 673.9 | 1.6 |
+| **mean** | PyTorch (CPU) | 0.955 | 95% | 76% | 0.84 | | 623.2 | 1.6 |
+| **mean** | ONNX Runtime (CPU) | 0.955 | 95% | 76% | 0.84 | | 331.3 | 3.0 |
 
 | Llama 3.2 1B (ExecuTorch, 8da4w, XNNPACK) on the Arm CPU | Value |
 |---|---|
 | Prefill tokens/s (median) | 49 |
 | Decode tokens/s (median) | 12.4 |
-| Defect advice, request to text (median) | 7.2 s |
+| Defect advice, time to first token (median) | 5.0 s |
+| Defect advice, total response time (median) | 7.2 s |
 | Load + first call | 41.8 s |
 | Peak RAM (whole process) | 1,312 MB |
 | Llama output accepted by the checks | 18/18 Llama calls |

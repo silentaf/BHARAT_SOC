@@ -9,6 +9,12 @@
   "pixel_auroc": 0.9891950910995997,
   "recall_at_threshold": 0.53,
   "false_alarm_rate": 0.0297029702970297,
+  "n_defective": 100,
+  "n_good": 101,
+  "true_positives": 53,
+  "false_positives": 3,
+  "precision": 0.9464285714285714,
+  "f1": 0.6794871794871795,
   "latency_ms": {
     "mean": 609.7137129748882,
     "p50": 608.3657810086152,

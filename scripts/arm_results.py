@@ -56,17 +56,21 @@ def block(res: Path) -> str:
     out = [f"**Measured on an Arm device:** {device_line(res)}. Same code and models as the laptop; "
            f"raw JSON in [`results/aarch64/`](results/aarch64/)."]
     if vision:
-        out += ["", "| Board | Backend | Image AUROC | Recall | False alarms | ms / frame (mean / p95) | FPS |",
-                "|---|---|---|---|---|---|---|"]
+        out += ["", "| Board | Backend | Image AUROC | Precision | Recall | F1 | False alarms | ms / frame (mean / p95) | FPS |",
+                "|---|---|---|---|---|---|---|---|---|"]
         for r in vision:
             out.append(f"| {r['model'][:-3]} | {BACKENDS[r['backend']]} | "
-                       f"{r['image_auroc']:.3f} | {r['recall_at_threshold']:.0%} | {r['false_alarm_rate']:.0%} | "
+                       f"{r['image_auroc']:.3f} | {r['precision']:.0%} | {r['recall_at_threshold']:.0%} | "
+                       f"{r['f1']:.2f} | {r['false_alarm_rate']:.0%} | "
                        f"{r['latency_ms']['mean']:.1f} / {r['latency_ms']['p95']:.1f} | {r['fps']:.1f} |")
         for b in BACKENDS:
             rs = [r for r in vision if r["backend"] == b]
             if rs:
                 out.append(f"| **mean** | {BACKENDS[b]} | "
-                           f"{statistics.mean(r['image_auroc'] for r in rs):.3f} | | | "
+                           f"{statistics.mean(r['image_auroc'] for r in rs):.3f} | "
+                           f"{statistics.mean(r['precision'] for r in rs):.0%} | "
+                           f"{statistics.mean(r['recall_at_threshold'] for r in rs):.0%} | "
+                           f"{statistics.mean(r['f1'] for r in rs):.2f} | | "
                            f"{statistics.mean(r['latency_ms']['mean'] for r in rs):.1f} | "
                            f"{statistics.mean(r['fps'] for r in rs):.1f} |")
     if llama:
@@ -74,7 +78,8 @@ def block(res: Path) -> str:
         out += ["", "| Llama 3.2 1B (ExecuTorch, 8da4w, XNNPACK) on the Arm CPU | Value |", "|---|---|",
                 f"| Prefill tokens/s (median) | {m['prefill_tok_s']:.0f} |",
                 f"| Decode tokens/s (median) | {m['decode_tok_s']:.1f} |",
-                f"| Defect advice, request to text (median) | {llama['advice_wall_s_median']:.1f} s |",
+                f"| Defect advice, time to first token (median) | {llama['advice_ttft_s_median']:.1f} s |",
+                f"| Defect advice, total response time (median) | {llama['advice_wall_s_median']:.1f} s |",
                 f"| Load + first call | {llama['load_plus_first_call_s']:.1f} s |",
                 f"| Peak RAM (whole process) | {llama['peak_rss_mb']:,} MB |",
                 f"| Llama output accepted by the checks | {llama['llama_output_accepted']} |"]

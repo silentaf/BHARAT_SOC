@@ -1,6 +1,6 @@
 # Phase 1 Plan — Bharat AI-SoC Challenge 2026–27, PS5
 
-**Goal:** submit by **21 Nov 2026** (2-day buffer before the **23 Nov** deadline in our shortlisting email).
+**Goal:** submit by **24 Nov 2026** (1-day buffer before the **25 Nov** deadline, extended from 23 Nov by the support email of 20 Nov).
 **Status (29 Oct):** shortlisted, PS5 confirmed. Laptop-side work done.
 **Arm device for Phase 1: Android phone (POCO M6 Plus 5G) — DONE 30 Oct**: set up over SSH, benchmarks
 in `results/aarch64/`, numbers in the report and README. Pi 5 + AI HAT+ 2: Phase 2 (`docs/pi.md`).
@@ -31,7 +31,7 @@ and can move to Phase 2 (PoC, due 10 Feb 2027) if time runs short.
 | 2 | 27 Oct–2 Nov | Pi setup: OS, camera, venv. Build ExecuTorch Llama runner on Pi. Run inspection on Pi CPU. **First full loop on Pi:** camera → defect → Llama advice → log. | End-to-end works on Pi; first FPS + tokens/s numbers |
 | 3 | 3–9 Nov | Hailo: compile backbone to HEF (Hailo compiler runs on x86 laptop), run on NPU, kNN stays on CPU. Llama features: shift report + questions over the inspection log. | CPU vs NPU benchmark; Llama answers log questions |
 | 4 | 10–14 Nov | Demo rig: camera stand, lighting, real PCBs (good + deliberately damaged). Full benchmarks on the Pi: FPS, latency, RAM, power (USB-C meter), Llama tokens/s. Attend the mentor doubt-clearing session. | Live inspection of real boards works; Pi numbers in report |
-| 5 | 15–21 Nov | Record demo video. Fill report placeholders, polish README, final test from a fresh clone. **Submit via the Challenge Submission Form.** | Submitted |
+| 5 | 15–24 Nov | Record demo video. Fill report placeholders, polish README, final test from a fresh clone. **Submit via the Challenge Submission Form.** | Submitted |
 
 ## If something slips
 

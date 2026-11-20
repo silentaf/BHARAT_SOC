@@ -147,13 +147,17 @@ latency, Llama advice from ExecuTorch, shift statistics, questions, teach a new 
 
 ### 6.1 Detection accuracy (VisA PCB, official one-class split)
 
-| Category | Image AUROC | Pixel AUROC | Recall @ threshold | False-alarm rate |
-|---|---|---|---|---|
-| pcb1 | 0.972 | 0.996 | 80% | 5% |
-| pcb2 | 0.932 | 0.986 | 81% | 5% |
-| pcb3 | 0.924 | 0.989 | 53% | 3% |
-| pcb4 | 0.990 | 0.985 | 91% | 3% |
-| **mean** | **0.955** | **0.989** | **76%** | **4%** |
+| Category | Image AUROC | Pixel AUROC | Precision | Recall @ threshold | F1 | False-alarm rate |
+|---|---|---|---|---|---|---|
+| pcb1 | 0.972 | 0.996 | 94% (80/85) | 80% | 0.86 | 5% |
+| pcb2 | 0.932 | 0.986 | 94% (81/86) | 81% | 0.87 | 5% |
+| pcb3 | 0.924 | 0.989 | 95% (53/56) | 53% | 0.68 | 3% |
+| pcb4 | 0.990 | 0.985 | 97% (91/94) | 91% | 0.94 | 3% |
+| **mean** | **0.955** | **0.989** | **95%** | **76%** | **0.84** | **4%** |
+
+Precision = boards flagged that really are defective (in brackets: true / all flagged); test sets
+have 100 defective and 100 (pcb1, pcb2) or 101 (pcb3, pcb4) good boards. Identical on the
+laptop and the Arm phone.
 
 Operating point: 99th-percentile threshold (favours few false alarms). pcb3's low recall at
 this threshold despite AUROC 0.924 means a lower threshold would catch more defects at the
@@ -181,7 +185,8 @@ Runtime measured 33.3 and 39.8 ms in two back-to-back runs. Earlier quiet-machin
 |---|---|---|---|
 | Prefill tokens/s (median) | 244 | 49 | Phase 2 |
 | Decode tokens/s (median) | 31.0 | 12.4 | Phase 2 |
-| Defect advice, request to text (median) | 2.3 s | 7.2 s | Phase 2 |
+| Defect advice, time to first token (median) | 1.0 s | 5.0 s | Phase 2 |
+| Defect advice, total response time (median) | 2.3 s | 7.2 s | Phase 2 |
 | Load + first call | 6.5 s | 41.8 s | Phase 2 |
 | Peak RAM (whole process) | 1,422 MB | 1,312 MB | Phase 2 |
 
@@ -201,6 +206,20 @@ CPU contention: with vision and Llama both on the laptop CPU, vision time per fr
 from 33 ms to ~100 ms while Llama was generating (live dashboard). This is the case for
 running the CNN on the Hailo NPU.
 
+**Whole application** (one process: vision, severity, SQLite log and Llama advisory via ExecuTorch;
+`/usr/bin/time -v scripts/run_inspection.py` on the 200 pcb1 test boards, ONNX Runtime, laptop CPU
+→ `results/x86_64/system_VLSI.json`):
+
+| Whole system, laptop (x86-64) | Value |
+|---|---|
+| Peak RAM (vision + Llama + log, whole process) | 1,577 MB |
+| Vision latency per frame with Llama generating alongside (mean / p95) | 62.7 / 114.7 ms |
+| Throughput | 16 FPS |
+| Llama advisories written to the log | 4 (one in flight at a time), all from Llama |
+
+On the phone the Llama process alone peaks at 1,312 MB (table below); the whole-app peak on the
+phone and the Pi is measured with the same command in Phase 2.
+
 **On Arm (Android phone).** The same code and models on the phone's Arm CPU, Ubuntu inside
 Termux (`docs/phone.md`), one command: `scripts/arm_benchmarks.sh`. Accuracy is identical to the
 laptop on all four boards. ONNX Runtime gives 3 frames/s (331 ms), enough for a board every
@@ -214,24 +233,25 @@ to ~6.8 tokens/s (both share the CPU), the same contention seen on the laptop.
 <!-- arm-results:begin -->
 **Measured on an Arm device:** Xiaomi POCO M6 Plus 5G (24066PC95I), Snapdragon 4 Gen 2, Cortex-A78 + Cortex-A55, 8 cores, 5.3 GB RAM visible to Linux, vision on 4 threads. Same code and models as the laptop; raw JSON in [`results/aarch64/`](results/aarch64/).
 
-| Board | Backend | Image AUROC | Recall | False alarms | ms / frame (mean / p95) | FPS |
-|---|---|---|---|---|---|---|
-| pcb1 | ONNX Runtime (CPU) | 0.972 | 80% | 5% | 333.1 / 362.2 | 3.0 |
-| pcb1 | PyTorch (CPU) | 0.972 | 80% | 5% | 643.2 / 680.7 | 1.6 |
-| pcb2 | ONNX Runtime (CPU) | 0.932 | 81% | 5% | 330.7 / 360.4 | 3.0 |
-| pcb2 | PyTorch (CPU) | 0.932 | 81% | 5% | 614.2 / 662.9 | 1.6 |
-| pcb3 | ONNX Runtime (CPU) | 0.924 | 53% | 3% | 326.8 / 355.5 | 3.1 |
-| pcb3 | PyTorch (CPU) | 0.924 | 53% | 3% | 609.7 / 653.2 | 1.6 |
-| pcb4 | ONNX Runtime (CPU) | 0.990 | 91% | 3% | 334.6 / 358.9 | 3.0 |
-| pcb4 | PyTorch (CPU) | 0.990 | 91% | 3% | 625.5 / 673.9 | 1.6 |
-| **mean** | PyTorch (CPU) | 0.955 | | | 623.2 | 1.6 |
-| **mean** | ONNX Runtime (CPU) | 0.955 | | | 331.3 | 3.0 |
+| Board | Backend | Image AUROC | Precision | Recall | F1 | False alarms | ms / frame (mean / p95) | FPS |
+|---|---|---|---|---|---|---|---|---|
+| pcb1 | ONNX Runtime (CPU) | 0.972 | 94% | 80% | 0.86 | 5% | 333.1 / 362.2 | 3.0 |
+| pcb1 | PyTorch (CPU) | 0.972 | 94% | 80% | 0.86 | 5% | 643.2 / 680.7 | 1.6 |
+| pcb2 | ONNX Runtime (CPU) | 0.932 | 94% | 81% | 0.87 | 5% | 330.7 / 360.4 | 3.0 |
+| pcb2 | PyTorch (CPU) | 0.932 | 94% | 81% | 0.87 | 5% | 614.2 / 662.9 | 1.6 |
+| pcb3 | ONNX Runtime (CPU) | 0.924 | 95% | 53% | 0.68 | 3% | 326.8 / 355.5 | 3.1 |
+| pcb3 | PyTorch (CPU) | 0.924 | 95% | 53% | 0.68 | 3% | 609.7 / 653.2 | 1.6 |
+| pcb4 | ONNX Runtime (CPU) | 0.990 | 97% | 91% | 0.94 | 3% | 334.6 / 358.9 | 3.0 |
+| pcb4 | PyTorch (CPU) | 0.990 | 97% | 91% | 0.94 | 3% | 625.5 / 673.9 | 1.6 |
+| **mean** | PyTorch (CPU) | 0.955 | 95% | 76% | 0.84 | | 623.2 | 1.6 |
+| **mean** | ONNX Runtime (CPU) | 0.955 | 95% | 76% | 0.84 | | 331.3 | 3.0 |
 
 | Llama 3.2 1B (ExecuTorch, 8da4w, XNNPACK) on the Arm CPU | Value |
 |---|---|
 | Prefill tokens/s (median) | 49 |
 | Decode tokens/s (median) | 12.4 |
-| Defect advice, request to text (median) | 7.2 s |
+| Defect advice, time to first token (median) | 5.0 s |
+| Defect advice, total response time (median) | 7.2 s |
 | Load + first call | 41.8 s |
 | Peak RAM (whole process) | 1,312 MB |
 | Llama output accepted by the checks | 18/18 Llama calls |
@@ -258,13 +278,13 @@ Compiled with the Hailo Dataflow Compiler 5.4.0 for Hailo-10H (AI HAT+ 2): HEFs 
 compile time 122 s per board on the laptop CPU. Accuracy of the INT8 model with the DFC emulator
 (same memory bank and threshold as FP32):
 
-| Category | Image AUROC FP32 → INT8 | Pixel AUROC FP32 → INT8 | Recall | False alarms |
-|---|---|---|---|---|
-| pcb1 | 0.972 → 0.972 | 0.996 → 0.996 | 80% → 85% | 5% → 5% |
-| pcb2 | 0.932 → 0.931 | 0.986 → 0.986 | 81% → 83% | 5% → 5% |
-| pcb3 | 0.924 → 0.931 | 0.989 → 0.989 | 53% → 55% | 3% → 3% |
-| pcb4 | 0.990 → 0.990 | 0.985 → 0.984 | 91% → 92% | 3% → 3% |
-| **mean** | **0.955 → 0.956** | **0.989 → 0.989** | **76% → 79%** | **4% → 4%** |
+| Category | Image AUROC FP32 → INT8 | Pixel AUROC FP32 → INT8 | Recall | F1 | False alarms |
+|---|---|---|---|---|---|
+| pcb1 | 0.972 → 0.972 | 0.996 → 0.996 | 80% → 85% | 0.86 → 0.89 | 5% → 5% |
+| pcb2 | 0.932 → 0.931 | 0.986 → 0.986 | 81% → 83% | 0.87 → 0.88 | 5% → 5% |
+| pcb3 | 0.924 → 0.931 | 0.989 → 0.989 | 53% → 55% | 0.68 → 0.70 | 3% → 3% |
+| pcb4 | 0.990 → 0.990 | 0.985 → 0.984 | 91% → 92% | 0.94 → 0.94 | 3% → 3% |
+| **mean** | **0.955 → 0.956** | **0.989 → 0.989** | **76% → 79%** | **0.84 → 0.85** | **4% → 4%** |
 
 NPU latency and power: Phase 2, on the AI HAT+ 2.
 

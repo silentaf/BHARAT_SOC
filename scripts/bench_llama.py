@@ -94,6 +94,9 @@ def main():
         "median": {k: statistics.median(r[k] for r in runs if k in r)
                    for k in ("prefill_tok_s", "decode_tok_s", "prompt_tokens", "generated_tokens", "wall_s")},
         "advice_wall_s_median": statistics.median(r["wall_s"] for r in runs if r["task"].startswith("advise")),
+        # time to first token: the prompt is processed (prefill) before the first token comes out
+        "advice_ttft_s_median": round(statistics.median(r.get("ttft_ms", r["prefill_ms"]) for r in runs
+                                                        if r["task"].startswith("advise") and "prefill_ms" in r) / 1000, 2),
         "llama_output_accepted": f"{sum(r['source'] == 'llama-executorch' for r in runs)}/"
                                  f"{sum(r['llama_called'] for r in runs)} Llama calls",
         "accepted_by_task": {t: f"{sum(r['source'] == 'llama-executorch' for r in runs if r['task'] == t)}/"

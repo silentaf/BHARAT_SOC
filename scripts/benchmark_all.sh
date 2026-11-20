@@ -22,11 +22,11 @@ done
 $PY - <<'EOF'
 import json, glob, platform
 rows = [json.load(open(p)) for p in sorted(glob.glob("outputs/benchmarks/pcb*_*.json"))]
-lines = ["| Category | Backend | Host | Image AUROC | Pixel AUROC | Recall | False alarms | ms mean / p95 | FPS |",
-         "|---|---|---|---|---|---|---|---|---|"]
+lines = ["| Category | Backend | Host | Image AUROC | Pixel AUROC | Precision | Recall | F1 | False alarms | ms mean / p95 | FPS |",
+         "|---|---|---|---|---|---|---|---|---|---|---|"]
 for r in rows:
     lines.append(f"| {r['model'][:-3]} | {r['backend']} | {r['machine']} | {r['image_auroc']:.3f} | {r['pixel_auroc']:.3f} | "
-                 f"{r['recall_at_threshold']:.2f} | {r['false_alarm_rate']:.2f} | "
+                 f"{r['precision']:.2f} | {r['recall_at_threshold']:.2f} | {r['f1']:.2f} | {r['false_alarm_rate']:.2f} | "
                  + ("emulator | - |" if r["backend"] == "hailo-emu" else  # x86 simulation time, not NPU speed
                     f"{r['latency_ms']['mean']:.1f} / {r['latency_ms']['p95']:.1f} | {r['fps']:.1f} |"))
 open("outputs/benchmarks/summary.md", "w").write("\n".join(lines) + "\n")
