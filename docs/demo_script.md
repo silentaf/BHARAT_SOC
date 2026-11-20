@@ -24,6 +24,12 @@ voice-over below in a video editor. The Ask scene is retaken (max 3) until Llama
 passes the checks; when a check replaces a Llama answer with the exact figures, the dashboard
 says so, and the voice-over can point at it.
 
+## AI voice-over (what we submitted)
+
+`.venv-tts/bin/python scripts/make_demo_video.py` reads the narration in that script with an offline
+Piper voice and joins it with the clips into `outputs/demo_video/QC-Assist_PS5_demo.mp4` (~4 min).
+Scene 8 shows the phone results in the README (the phone setup was removed after the benchmarks).
+
 ## Phone clip (scene 8, record it first, ~10 min)
 
 1. Phone plugged in, **mobile data and Wi-Fi off** (shows it is offline).
