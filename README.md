@@ -1,7 +1,8 @@
 # QC-Assist — On-device PCB Inspection Assistant
 
 **Bharat AI-SoC Challenge 2026–27 · PS5: Real-time industrial defect detection & quality-control assistant**
-Theme: Manufacturing & Industry 4.0
+Theme: Manufacturing & Industry 4.0  
+**Team Win** · SVNIT Surat · Aman Gupta (leader), Kaustubh Srivastava, Akshat Rakeshkumar Patel · Faculty mentor: Dr. (Ms.) Shilpi Gupta
 
 QC-Assist inspects printed circuit boards in real time on an Arm device (Android phone now, Raspberry Pi 5 + Hailo NPU next), highlights
 defects, rates their severity, and gives the operator advice from **Llama 3.2 1B

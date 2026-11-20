@@ -5,7 +5,7 @@
 Problem Statement 5: Real-time industrial defect detection & quality-control assistant ·
 Theme: Manufacturing & Industry 4.0
 
-**Team:** [TEAM NAME] · **Institute:** [COLLEGE] · **Members:** [NAMES] · **Faculty mentor:** [MENTOR NAME]
+**Team:** Win · **Institute:** Sardar Vallabhbhai National Institute of Technology (SVNIT), Surat · **Members:** Aman Gupta (team leader), Kaustubh Srivastava, Akshat Rakeshkumar Patel · **Faculty mentor:** Dr. (Ms.) Shilpi Gupta
 
 **Code:** https://github.com/silentaf/BHARAT_SOC
 

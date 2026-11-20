@@ -6,7 +6,7 @@
 in `results/aarch64/`, numbers in the report and README. Pi 5 + AI HAT+ 2: Phase 2 (`docs/pi.md`).
 Left for the team:
 4. Record the demo video (laptop dashboard + one scene of the app on the phone with its camera).
-5. Fill `[TEAM NAME]` etc. in the report, add the video link to the README, fresh-clone test, submit.
+5. Add the video link to the README, fresh-clone test, submit.
 **What to submit:** technical report + source code (GitHub) + demo video.
 
 ## What Phase 1 must prove (shortlisting bar)
