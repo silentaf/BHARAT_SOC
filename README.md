@@ -16,7 +16,7 @@ running on-device through ExecuTorch** — fully offline, nothing leaves the fac
 |---|---|
 | Source code | this repository |
 | Application | `python -m qc_assist`: the operator app (live camera, defect + type + severity, Llama advice, log, shift report, questions, teach a new board). Runs on a laptop, an Android phone ([`docs/phone.md`](docs/phone.md)) or a Raspberry Pi 5 |
-| Demonstration video | [link to be added] · script: [`docs/demo_script.md`](docs/demo_script.md) |
+| Demonstration video | **[Watch the demo video (4 min)](https://drive.google.com/file/d/1RrJgBOz1Iqp__fYsDWInlgsv9g6DFIyW/view?usp=sharing)** · script: [`docs/demo_script.md`](docs/demo_script.md) |
 | Technical report | [`docs/technical_report.md`](docs/technical_report.md) (PDF: `python scripts/build_report.py`) |
 
 ## Results (laptop, and an Arm phone below)
@@ -84,7 +84,7 @@ deterministic text ([`results/x86_64/llama_VLSI.json`](results/x86_64/llama_VLSI
 | Raspberry Pi 5 / AI HAT+ 2 runs | Phase 2: hardware in hand, setup ready ([`docs/pi.md`](docs/pi.md)) |
 
 Phase 1 report: [`docs/technical_report.md`](docs/technical_report.md) (PDF: `python scripts/build_report.py`).
-Demo video script: [`docs/demo_script.md`](docs/demo_script.md).
+Demo video: [Google Drive](https://drive.google.com/file/d/1RrJgBOz1Iqp__fYsDWInlgsv9g6DFIyW/view?usp=sharing) · script: [`docs/demo_script.md`](docs/demo_script.md).
 
 ## Why it is different
 

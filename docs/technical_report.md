@@ -333,6 +333,8 @@ stays low at 20 boards), so a factory starts with ~20 and adds boards as they pa
 
 ## 8. Demo
 
+Video (4 min): https://drive.google.com/file/d/1RrJgBOz1Iqp__fYsDWInlgsv9g6DFIyW/view?usp=sharing
+
 The Phase 1 demo video follows `docs/demo_script.md`: live inspection with defect types
 and Llama advice, operator questions and the shift report, Hindi, and teaching a new board
 type from 20 good boards. It runs on the laptop with `scripts/demo.py`.
