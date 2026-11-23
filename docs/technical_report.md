@@ -372,7 +372,7 @@ backbone on the NPU: only the kNN step and the anomaly map stay on the CPU, leav
 
 ## 8. Demo
 
-Video (4 min): https://drive.google.com/file/d/1RrJgBOz1Iqp__fYsDWInlgsv9g6DFIyW/view?usp=sharing
+Video (2 min): https://drive.google.com/file/d/1XSbPxWmzXhO9t0GHNHcuiBUCLr3uSyGW/view?usp=sharing
 
 The Phase 1 demo video follows `docs/demo_script.md`: live inspection with defect types
 and Llama advice, operator questions and the shift report, Hindi, and teaching a new board
