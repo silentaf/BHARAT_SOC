@@ -1,17 +1,20 @@
 """Assemble the Phase 1 demo video: the silent scene clips from record_demo.py plus an
 AI voice-over (Piper TTS, offline) -> outputs/demo_video/QC-Assist_PS5_demo.mp4
 
-    .venv-tts/bin/python scripts/make_demo_video.py
+    .venv-tts/bin/python scripts/make_demo_video.py          # full version, ~4 min
+    .venv-tts/bin/python scripts/make_demo_video.py short    # 2-minute submission cut
 
 Needs a separate venv so the main one (ExecuTorch, torch) is untouched:
     uv venv --python 3.12 .venv-tts && uv pip install --python .venv-tts/bin/python piper-tts imageio-ffmpeg
     .venv-tts/bin/python -m piper.download_voices en_US-lessac-high --data-dir .cache/piper
 
 Each scene lasts as long as its narration plus a short pause: a longer clip is sped up (at most
-1.6x, then the scene is longer than its narration), a shorter one holds its last frame.
+1.6x, then the scene is longer than its narration), a shorter one holds its last frame. The short cut instead plays a chosen window of each clip,
+sped up to fit its narration.
 """
 
 import json
+import sys
 import subprocess
 import wave
 from pathlib import Path
@@ -72,6 +75,30 @@ SCENES = [
      "samples. Thank you."),
 ]
 
+# 2-minute cut (the submission guideline): (clip, window start s, window end s, narration).
+SHORT = [
+    ("s1_readme", 0, 25, "This is Q C Assist, by team Win from S V N I T Surat, for problem statement five of the "
+     "Arm Bharat A I S o C Challenge: real-time circuit board defect detection, fully on the device."),
+    ("s2_architecture", 0, 34, "Factory networks are often offline, and board images are confidential, so "
+     "everything runs on Arm. A vision network finds and classifies defects. Llama three point two, one "
+     "billion, running through Execu-Torch on the C P U, advises the operator."),
+    ("s3_inspect", 0, 33, "Good boards pass. A defect gets a heat map, a severity, and a type: missing part, "
+     "bent pin, scratch, or melted solder. The model learned from good boards only. The first advice line is "
+     "a plant rule, decided by code. Llama then explains what to check, and the likely cause."),
+    ("s4_ask_report", 2, 24, "Operators can ask about the shift in plain language. The numbers come from the "
+     "inspection log, and every Llama answer is checked against them."),
+    ("s5_hindi", 22, 36, "Many operators prefer Hindi. One click switches the advice and the shift report to Hindi."),
+    ("s6_teach", 0, 38, "A new product arrives, with no model. We point it at twenty good boards and click "
+     "train. Three seconds later, on the device, it is inspecting the new board. No defect images, and no "
+     "cloud."),
+    ("s7_results", 0, 62, "On the VisA circuit board dataset, the mean image A U R O C is zero point nine five "
+     "five, with ninety five percent precision. Vision takes about forty milliseconds a frame. In eight-bit "
+     "form for the Hailo N P U, accuracy is unchanged. Four-bit Llama answers in about a second, and the whole "
+     "app peaks at one point six gigabytes."),
+    ("s8_status", 0, 28, "On an Android phone's Arm C P U, offline, the accuracy was the same, and Llama ran at "
+     "twelve tokens per second. Q C Assist: offline, on-device inspection. Thank you."),
+]
+
 
 def run(*args):
     subprocess.run([FFMPEG, "-loglevel", "error", "-y", *map(str, args)], check=True)
@@ -92,25 +119,36 @@ def tts(text: str, out: Path) -> float:
 
 
 def main():
-    WORK.mkdir(parents=True, exist_ok=True)
+    short = sys.argv[1:] == ["short"]
+    work = WORK / "short" if short else WORK
+    work.mkdir(parents=True, exist_ok=True)
     parts, log = [], []
-    for i, (clip, text) in enumerate(SCENES, 1):
-        voice = WORK / f"{i:02d}.wav"
+    scenes = [(c, a, b, t) for c, a, b, t in SHORT] if short else [(c, None, None, t) for c, t in SCENES]
+    for i, (clip, a, b, text) in enumerate(scenes, 1):
+        voice = work / f"{i:02d}.wav"
         speech = tts(text, voice)
-        target = speech + PAUSE + (0.6 if i > 1 else 0.3)
         name, _, where = clip.partition("@")
         src = CLIPS / f"{name}.mp4"
         length = duration(src)
+        if short:  # play the window, sped up to fit the narration
+            target = speech + 0.9
+            start = a
+            length = min(b, length) - a
+            speed = max(length / target, 1.0)
+            vf = f"setpts=(PTS-STARTPTS)/{speed:.4f}"
+            where = "window"
+        else:
+            target = speech + PAUSE + (0.6 if i > 1 else 0.3)
         if not where:
             target = max(target, length / MAX_SPEEDUP)  # never cut a clip short
         if where == "end":  # closing shot: the last seconds of the clip
             vf, start, speed = "setpts=PTS-STARTPTS", max(length - target, 0), 1.0
             length = min(length, target)
-        else:
+        elif not short:
             speed = min(max(length / target, 1.0), MAX_SPEEDUP)
             vf, start = f"setpts=(PTS-STARTPTS)/{speed:.4f}", 0
         hold = max(target - length / speed, 0)
-        out = WORK / f"{i:02d}.mp4"
+        out = work / f"{i:02d}.mp4"
         run("-ss", f"{start:.2f}", "-i", src, "-i", voice,
             "-filter_complex",
             f"[0:v]{vf},fps=30,tpad=stop_mode=clone:stop_duration={hold + 0.1:.2f},format=yuv420p[v];"
@@ -122,11 +160,11 @@ def main():
         log.append({"scene": i, "clip": clip, "speech_s": round(speech, 1), "scene_s": round(target, 1),
                     "speedup": round(speed, 2), "hold_s": round(hold, 1)})
         print(log[-1])
-    listing = WORK / "list.txt"
+    listing = work / "list.txt"
     listing.write_text("".join(f"file '{p.name}'\n" for p in parts))
-    final = CLIPS / "QC-Assist_PS5_demo.mp4"
+    final = CLIPS / ("QC-Assist_PS5_demo_2min.mp4" if short else "QC-Assist_PS5_demo.mp4")
     run("-f", "concat", "-safe", "0", "-i", listing, "-c", "copy", "-movflags", "+faststart", final)
-    (WORK / "timeline.json").write_text(json.dumps(log, indent=1))
+    (work / "timeline.json").write_text(json.dumps(log, indent=1))
     print(f"-> {final} ({duration(final) / 60:.1f} min)")
 
 

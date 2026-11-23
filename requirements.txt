@@ -20,3 +20,4 @@ onnxruntime
 huggingface_hub
 pytest
 markdown          # scripts/build_report.py (report PDF)
+psutil            # scripts/measure_utilisation.py

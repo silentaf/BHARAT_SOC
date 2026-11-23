@@ -316,6 +316,45 @@ With 20 boards the alarm threshold is set by 5-fold scoring (§4.3), which keeps
 alarms near 5%; detection of subtle defects is lower than with 200 boards (pcb2 recall
 stays low at 20 boards), so a factory starts with ~20 and adds boards as they pass.
 
+### 6.7 Hardware utilisation
+
+**CPU and memory (laptop).** Intel Core i7-14650HX, 24 logical CPUs, 22.7 GB RAM. Measured with
+`scripts/measure_utilisation.py`, which samples the whole process tree every 0.2 s (psutil) →
+`results/x86_64/utilisation_<workload>_VLSI.json`. "Cores busy" is CPU time per second while the
+workload is running (start-up waits left out); other load on the machine averaged under 3%.
+
+| Workload | Cores busy, mean / peak (of 24) | CPU % of machine, mean / peak | Peak RAM (% of 22.7 GB) | Threads |
+|---|---|---|---|---|
+| Vision only: `evaluate.py`, ONNX Runtime, pcb1, 200 boards | 13.7 / 17.7 | 57% / 74% | 689 MB (3.0%) | 124 |
+| Llama only: `bench_llama.py`, 8 tasks (advice, reports, questions; EN + HI) | 16.5 / 22.0 | 69% / 92% | 1,357 MB (5.8%) | 430 |
+| Whole app: `run_inspection.py`, 200 boards + 4 Llama advisories, one process | 15.0 / 20.6 | 63% / 86% | 1,558 MB (6.7%) | 488 |
+
+**CPU and memory (Arm phone).** Snapdragon 4 Gen 2: 2 × Cortex-A78 + 6 × Cortex-A55, 5.3 GB RAM.
+Vision uses 4 ONNX Runtime threads, the fastest setting (2 / 4 / 6 / 8 threads: 547 / 519 / 536 /
+576 ms per frame, §5); beyond 4, the slow A55 cores only add waiting. Llama peaks at 1.31 GB
+(24% of the phone's RAM) at 12.4 tokens/s.
+
+**NPU (Hailo-10H, AI HAT+ 2).** Resource allocation reported by the Hailo Dataflow Compiler 5.4
+(`models/hailo/pcb<N>_compile.log`). The whole vision backbone fits in **one context**, so it
+runs without reloading weights between parts of the network:
+
+| Category | Control | Compute | Memory (weights) | HEF size |
+|---|---|---|---|---|
+| pcb1 | 75.0% | 75.4% | 56.3% | 4.4 MB |
+| pcb2 | 76.3% | 75.8% | 57.5% | 3.9 MB |
+| pcb3 | 75.0% | 75.4% | 56.3% | 4.4 MB |
+| pcb4 | 75.0% | 75.4% | 55.5% | 3.9 MB |
+
+75% is the compiler's default utilisation cap for a single context. NPU latency and power are
+measured on the device in Phase 2.
+
+**Storage.** Llama `.pte` 860 MB; per product: ONNX backbone 11 MB (shared design, one file per
+product), memory bank 4.9 MB (0.5 MB for a board taught from 20 samples), Hailo HEF 3.9–4.4 MB.
+
+**What this means.** At one frame at a time, vision spreads over ~14 cores, and Llama decoding
+uses almost all of them. On a 4-core Pi 5 they would compete, which is why Phase 2 puts the
+backbone on the NPU: only the kNN step and the anomaly map stay on the CPU, leaving it free for Llama.
+
 ## 7. Limitations
 
 - VisA images are captured under controlled lighting; real-line robustness needs our own
@@ -359,6 +398,7 @@ bash scripts/benchmark_all.sh                      # train + accuracy/latency, t
 python scripts/train_types.py --model models/pcb1.pt --data data/visa/pcb1   # defect types (§6.3)
 python scripts/export_llama.py && python scripts/bench_llama.py --repeats 3   # Llama (§6.2)
 bash scripts/compile_hailo.sh                      # HEF + INT8 emulator accuracy (§6.4)
+python scripts/measure_utilisation.py vision -- python scripts/evaluate.py --model models/pcb1.pt --data data/visa/pcb1 --backend onnx   # §6.7
 ```
 
 Licenses: VisA CC BY 4.0 (Zou et al., ECCV 2022); Llama 3.2 Community License.

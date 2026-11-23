@@ -1,6 +1,6 @@
 # Phase 1 demo video: script and shot list
 
-Target length: 4–5 minutes, 1080p screen recording with voice-over.
+Target length: 4–5 minutes (full) and 2 minutes (submission cut: `make_demo_video.py short`), 1080p screen recording with voice-over.
 Recorder: OBS Studio, or GNOME's built-in recorder (Ctrl+Shift+Alt+R starts and stops it).
 
 ## Before recording
